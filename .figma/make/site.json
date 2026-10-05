@@ -1,0 +1,12 @@
+{
+  "title": "DocMorph — File Studio Pro",
+  "description": "Streamline document management with a versatile platform for converting, compressing, summarizing, and optimizing files and images in one workspace.",
+  "language": "en",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
