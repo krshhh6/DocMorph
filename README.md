@@ -119,7 +119,7 @@ python detector.py
 
 - **Krishna Kant** ([@krshhh6](https://github.com/krshhh6)) — *Creator · AI Forensics, Video Deepfake Engine & Architecture*
 - **Sampoorn Tripathi** — *Frontend Architecture & ATS Resume Scoring Engine*
-- **Divyam Pathak** — *Passport Photo Studio & Document Summarizer Pipelines*
+- **Divyam Pathak** ([@divyam-pathak02](https://github.com/divyam-pathak02)) — *Passport Photo Studio & Plagiarism Analyzer*
 
 *B.Tech Computer Science & Engineering — Semester 3 Project*
 
