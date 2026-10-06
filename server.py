@@ -2,7 +2,7 @@ import os
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
-from converter import convert_file
+from converter import convert_file, merge_images_to_pdf
 import uvicorn
 
 app = FastAPI(title="DocMorph File Conversion API")
@@ -38,6 +38,24 @@ async def convert_endpoint(
             content=out_bytes,
             media_type=mime_type,
             headers={"Content-Disposition": f'attachment; filename="{out_name}"'}
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/merge-images-to-pdf")
+async def merge_images_to_pdf_endpoint(
+    orientation: str = Form("portrait"),
+    files: list[UploadFile] = File(...)
+):
+    try:
+        bytes_list = []
+        for f in files:
+            bytes_list.append(await f.read())
+        pdf_bytes = merge_images_to_pdf(bytes_list, orientation=orientation)
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={"Content-Disposition": 'attachment; filename="docmorph_merged.pdf"'}
         )
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

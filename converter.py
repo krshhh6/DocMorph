@@ -38,6 +38,31 @@ def convert_docx_to_pdf(input_bytes: bytes) -> bytes:
 
         raise RuntimeError("No suitable DOCX to PDF converter found (LibreOffice required in Linux).")
 
+def merge_images_to_pdf(image_bytes_list: list[bytes], orientation: str = "portrait") -> bytes:
+    """Merges multiple image byte streams into a single multi-page PDF."""
+    pil_images = []
+    for b in image_bytes_list:
+        img = Image.open(io.BytesIO(b))
+        if img.mode in ('RGBA', 'LA', 'P'):
+            img = img.convert('RGB')
+        
+        w, h = img.size
+        if orientation == "landscape" and h > w:
+            img = img.rotate(270, expand=True)
+        elif orientation == "portrait" and w > h:
+            img = img.rotate(270, expand=True)
+            
+        pil_images.append(img)
+        
+    if not pil_images:
+        raise ValueError("No images provided for PDF merge.")
+        
+    out_buf = io.BytesIO()
+    first = pil_images[0]
+    rest = pil_images[1:]
+    first.save(out_buf, format="PDF", save_all=True, append_images=rest, resolution=100.0)
+    return out_buf.getvalue()
+
 def convert_file(input_bytes: bytes, filename: str, target_fmt: str) -> tuple[bytes, str, str]:
     """
     Converts input_bytes into target_fmt.

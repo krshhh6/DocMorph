@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
 import type { ReactNode } from 'react'
-import { AlertTriangle, CheckCircle2, Download, FileText, RotateCcw, Sparkles, Upload, X } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Download, FileText, RotateCcw, RotateCw, Sparkles, Upload, X, ArrowLeft, ArrowRight, Trash2, Plus, ArrowUpDown, Check, FileCheck } from 'lucide-react'
 import { Card, Eyebrow, PrimaryButton, StatsStrip, StatusChip, TagChip } from './ui'
 import { PassportFace } from './Workspace'
 
@@ -94,55 +94,121 @@ function Seg({ options, value, onChange }: { options: string[]; value: string; o
   )
 }
 
-interface ConvertJob {
+interface FileCardItem {
   id: string
-  file?: File
+  file: File
   name: string
-  from: string
-  to: string
+  previewUrl: string
   size: string
-  status: 'Done' | 'Processing' | 'Queued' | 'Failed'
-  downloadUrl?: string
-  downloadName?: string
-  error?: string
+  rotation: number
+  isImage: boolean
+}
+
+interface ConvertedResult {
+  url: string
+  name: string
+  size: string
+  count: number
 }
 
 /* 01 Converter */
 export function Converter() {
   const [fmt, setFmt] = useState('PDF')
+  const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('portrait')
+  const [pageSize, setPageSize] = useState('A4 (297x210 mm)')
+  const [margin, setMargin] = useState<'none' | 'small' | 'big'>('none')
+  const [mergeAll, setMergeAll] = useState(true)
+  const [files, setFiles] = useState<FileCardItem[]>([])
   const [isConverting, setIsConverting] = useState(false)
-  const [jobs, setJobs] = useState<ConvertJob[]>([])
+  const [convertedResult, setConvertedResult] = useState<ConvertedResult | null>(null)
+  const addFilesInputRef = useRef<HTMLInputElement>(null)
 
-  const handleFiles = (fileList: FileList) => {
-    const newJobs: ConvertJob[] = Array.from(fileList).map(f => {
-      const ext = f.name.split('.').pop()?.toUpperCase() || 'FILE'
-      const sz = f.size > 1048576 ? `${(f.size / 1048576).toFixed(1)} MB` : `${Math.round(f.size / 1024)} KB`
+  const handleAddFiles = (fileList: FileList) => {
+    const newItems: FileCardItem[] = Array.from(fileList).map(f => {
+      const isImg = f.type.startsWith('image/')
       return {
         id: Math.random().toString(36).substring(7),
         file: f,
         name: f.name,
-        from: ext,
-        to: fmt,
-        size: sz,
-        status: 'Queued',
+        previewUrl: isImg ? URL.createObjectURL(f) : '',
+        size: f.size > 1048576 ? `${(f.size / 1048576).toFixed(1)} MB` : `${Math.round(f.size / 1024)} KB`,
+        rotation: 0,
+        isImage: isImg,
       }
     })
-    setJobs(prev => [...newJobs, ...prev])
+    setFiles(prev => [...prev, ...newItems])
+  }
+
+  const moveFile = (index: number, direction: -1 | 1) => {
+    setFiles(prev => {
+      const target = index + direction
+      if (target < 0 || target >= prev.length) return prev
+      const next = [...prev]
+      const temp = next[index]
+      next[index] = next[target]
+      next[target] = temp
+      return next
+    })
+  }
+
+  const rotateFile = (id: string) => {
+    setFiles(prev => prev.map(f => f.id === id ? { ...f, rotation: (f.rotation + 90) % 360 } : f))
+  }
+
+  const removeFile = (id: string) => {
+    setFiles(prev => {
+      const item = prev.find(f => f.id === id)
+      if (item?.previewUrl) URL.revokeObjectURL(item.previewUrl)
+      return prev.filter(f => f.id !== id)
+    })
+  }
+
+  const sortFiles = () => {
+    setFiles(prev => [...prev].sort((a, b) => a.name.localeCompare(b.name)))
+  }
+
+  const clearAll = () => {
+    files.forEach(f => { if (f.previewUrl) URL.revokeObjectURL(f.previewUrl) })
+    setFiles([])
+    setConvertedResult(null)
   }
 
   const runConversion = async () => {
-    const pending = jobs.filter(j => j.status === 'Queued' && j.file)
-    if (pending.length === 0) {
-      alert('Please upload files to convert!')
+    if (files.length === 0) {
+      alert('Please select files first!')
       return
     }
 
     setIsConverting(true)
-    for (const job of pending) {
-      setJobs(prev => prev.map(j => j.id === job.id ? { ...j, status: 'Processing', to: fmt } : j))
-      try {
+    try {
+      const allImages = files.every(f => f.isImage)
+      if (fmt === 'PDF' && mergeAll && allImages) {
         const formData = new FormData()
-        formData.append('file', job.file!)
+        formData.append('orientation', orientation)
+        files.forEach(f => formData.append('files', f.file))
+
+        const res = await fetch(`${BACKEND_URL}/api/merge-images-to-pdf`, {
+          method: 'POST',
+          body: formData,
+        })
+
+        if (!res.ok) {
+          const err = await res.text()
+          throw new Error(err || 'Merge failed')
+        }
+
+        const blob = await res.blob()
+        const url = URL.createObjectURL(blob)
+        setConvertedResult({
+          url,
+          name: 'docmorph_merged.pdf',
+          size: `${(blob.size / 1024).toFixed(1)} KB`,
+          count: files.length,
+        })
+      } else {
+        const first = files[0]
+        const formData = new FormData()
+        formData.append('file', first.file)
         formData.append('target_format', fmt)
 
         const res = await fetch(`${BACKEND_URL}/api/convert`, {
@@ -151,116 +217,358 @@ export function Converter() {
         })
 
         if (!res.ok) {
-          const errDetail = await res.text()
-          throw new Error(errDetail || 'Conversion failed')
+          const err = await res.text()
+          throw new Error(err || 'Conversion failed')
         }
 
         const blob = await res.blob()
-        const downloadUrl = window.URL.createObjectURL(blob)
-        const baseName = job.name.substring(0, job.name.lastIndexOf('.')) || job.name
+        const url = URL.createObjectURL(blob)
+        const baseName = first.name.substring(0, first.name.lastIndexOf('.')) || first.name
         const outExt = fmt.toLowerCase() === 'jpg' ? 'jpg' : fmt.toLowerCase()
-        const downloadName = `${baseName}.${outExt}`
 
-        setJobs(prev => prev.map(j => j.id === job.id ? {
-          ...j,
-          status: 'Done',
-          to: fmt,
-          downloadUrl,
-          downloadName,
-        } : j))
-
-        const a = document.createElement('a')
-        a.href = downloadUrl
-        a.download = downloadName
-        document.body.appendChild(a)
-        a.click()
-        document.body.removeChild(a)
-      } catch (err: any) {
-        setJobs(prev => prev.map(j => j.id === job.id ? {
-          ...j,
-          status: 'Failed',
-          error: err.message,
-        } : j))
+        setConvertedResult({
+          url,
+          name: `${baseName}.${outExt}`,
+          size: `${(blob.size / 1024).toFixed(1)} KB`,
+          count: 1,
+        })
       }
+    } catch (err: any) {
+      alert('Conversion error: ' + err.message)
+    } finally {
+      setIsConverting(false)
     }
-    setIsConverting(false)
   }
 
-  const doneCount = jobs.filter(j => j.status === 'Done').length
-  const pendingFilesCount = jobs.filter(j => j.file && j.status === 'Queued').length
+  // View: Success / Dedicated Download Screen
+  if (convertedResult) {
+    return (
+      <Card className="p-8 md:p-16 text-center">
+        <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-500">
+          <CheckCircle2 size={42} />
+        </div>
+        <h2 className="mt-6 text-3xl font-extrabold tracking-tight">Your {convertedResult.name.endsWith('.pdf') ? 'PDF' : 'file'} is ready!</h2>
+        <p className="mt-2 text-sm text-body">
+          Successfully processed {convertedResult.count} file{convertedResult.count > 1 ? 's' : ''} with DocMorph Engine.
+        </p>
 
+        <div className="mx-auto mt-6 flex max-w-sm items-center justify-between rounded-[16px] border border-line-warm bg-msurf p-4 text-left">
+          <div className="flex items-center gap-3">
+            <span className="grid h-10 w-10 place-items-center rounded-[10px] bg-card text-amber-ink">
+              <FileCheck size={20} />
+            </span>
+            <div>
+              <p className="font-semibold text-sm truncate max-w-[200px]" title={convertedResult.name}>{convertedResult.name}</p>
+              <p className="font-mono text-[11px] text-muted">{convertedResult.size}</p>
+            </div>
+          </div>
+          <span className="rounded-full bg-emerald-500/10 px-2.5 py-0.5 font-mono text-[10px] font-semibold text-emerald-600">READY</span>
+        </div>
+
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
+          <a
+            href={convertedResult.url}
+            download={convertedResult.name}
+            className="inline-flex items-center gap-2 rounded-[14px] bg-red-600 px-8 py-3.5 font-bold text-white shadow-lg shadow-red-600/25 transition-all hover:bg-red-700 hover:scale-[1.02]"
+          >
+            <Download size={18} /> Download {convertedResult.name.endsWith('.pdf') ? 'PDF' : 'File'}
+          </a>
+          <button
+            onClick={() => {
+              URL.revokeObjectURL(convertedResult.url)
+              setConvertedResult(null)
+            }}
+            className="inline-flex items-center gap-2 rounded-[14px] border border-line-warm bg-card px-6 py-3.5 text-sm font-semibold transition-colors hover:border-ink"
+          >
+            <RotateCcw size={15} /> Back to Organizer
+          </button>
+        </div>
+      </Card>
+    )
+  }
+
+  // View: No files uploaded yet (initial dropzone)
+  if (files.length === 0) {
+    return (
+      <>
+        <ToolHeader
+          n="01"
+          name="Universal Converter"
+          title="Image & Document to PDF"
+          desc="Organize, rotate and merge multiple images or documents into a single professional PDF."
+          stats={[
+            ['Formats', '5'],
+            ['Reorder', 'Interactive'],
+            ['Orientation', 'Portrait / Landscape'],
+            ['Engine', 'Railway LibreOffice']
+          ]}
+        />
+        <Card className="p-8 md:p-14">
+          <div className="mx-auto max-w-xl">
+            <Dropzone text="Drop images or documents here to organize & convert" onFiles={handleAddFiles} />
+          </div>
+        </Card>
+      </>
+    )
+  }
+
+  // View: Interactive iLovePDF-style Organizer & Options Panel
   return (
     <>
       <ToolHeader
         n="01"
         name="Universal Converter"
-        title="Universal Converter"
-        desc="Batch-convert documents, images and PDFs directly via your cloud Python backend."
+        title="Organize & Convert Files"
+        desc="Drag, reorder, rotate your pages, configure page orientation and download your final PDF."
         stats={[
-          ['Formats', '5'],
-          ['Queue Size', `${jobs.length}`],
-          ['Completed', `${doneCount} / ${jobs.length}`],
+          ['Selected', `${files.length} Files`],
+          ['Target Format', fmt],
+          ['Orientation', orientation.toUpperCase()],
           ['Backend', 'Railway Online']
         ]}
       />
-      <Workbench
-        left={<>
-          <Panel label="Upload" />
-          <Dropzone text="Drop files to convert" onFiles={handleFiles} />
-          <Panel label="Output Format" />
-          <Seg options={['PDF', 'DOCX', 'PNG', 'JPG', 'WEBP']} value={fmt} onChange={setFmt} />
-          <PrimaryButton onClick={runConversion} disabled={isConverting} className="self-start">
-            {isConverting ? 'Converting...' : pendingFilesCount > 0 ? `Convert ${pendingFilesCount} files to ${fmt}` : `Upload files to convert to ${fmt}`}
-          </PrimaryButton>
-        </>}
-        right={<>
-          <Panel label="Conversion Queue" action={<span className="font-mono text-[10px] text-muted">{doneCount} / {jobs.length} DONE</span>} />
-          <div className="overflow-x-auto rounded-[16px] border border-line">
-            <table className="w-full text-sm">
-              <thead className="bg-msurf font-mono text-[10px] uppercase tracking-[0.08em] text-muted">
-                <tr>{['File', 'From', 'To', 'Size', 'Status', 'Action'].map(h => <th key={h} className="px-4 py-3 text-left font-medium">{h}</th>)}</tr>
-              </thead>
-              <tbody className="divide-y divide-line">
-                {jobs.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="px-4 py-10 text-center text-muted">
-                      No files in queue. Click or drag & drop files on the left to start converting.
-                    </td>
-                  </tr>
-                ) : (
-                  jobs.map(job => (
-                    <tr key={job.id}>
-                      <td className="px-4 py-3 font-medium">
-                        <span className="flex items-center gap-2">
-                          <FileText size={14} className="text-muted" />
-                          <span className="max-w-[140px] truncate md:max-w-[200px]" title={job.name}>{job.name}</span>
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 font-mono text-xs text-muted">{job.from}</td>
-                      <td className="px-4 py-3 font-mono text-xs">{job.to}</td>
-                      <td className="px-4 py-3 font-mono text-xs text-muted">{job.size}</td>
-                      <td className="px-4 py-3"><StatusChip status={job.status} /></td>
-                      <td className="px-4 py-3">
-                        {job.downloadUrl ? (
-                          <a
-                            href={job.downloadUrl}
-                            download={job.downloadName}
-                            className="inline-flex items-center gap-1 font-mono text-xs text-amber-ink hover:underline"
-                          >
-                            <Download size={12} /> Save
-                          </a>
-                        ) : (
-                          <span className="text-xs text-muted">—</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+
+      <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
+        {/* Left: Interactive Card Grid */}
+        <Card className="flex flex-col gap-6 p-6">
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line-warm pb-4">
+            <div className="flex items-center gap-3">
+              <span className="rounded-full bg-btn text-btn-ink px-3 py-1 font-mono text-xs font-semibold">
+                {files.length} file{files.length > 1 ? 's' : ''}
+              </span>
+              <span className="font-mono text-xs text-muted">Use arrows or rotate each card</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={sortFiles}
+                className="inline-flex items-center gap-1.5 rounded-[10px] border border-line-warm bg-card px-3 py-1.5 font-mono text-xs text-body hover:border-ink"
+                title="Sort A to Z"
+              >
+                <ArrowUpDown size={13} /> Sort A-Z
+              </button>
+              <button
+                onClick={clearAll}
+                className="inline-flex items-center gap-1.5 rounded-[10px] border border-line-warm bg-card px-3 py-1.5 font-mono text-xs text-body hover:border-danger hover:text-danger"
+              >
+                <Trash2 size={13} /> Clear
+              </button>
+              <button
+                onClick={() => addFilesInputRef.current?.click()}
+                className="inline-flex items-center gap-1.5 rounded-[10px] bg-red-600 text-white px-3.5 py-1.5 font-mono text-xs font-semibold hover:bg-red-700 shadow-sm"
+              >
+                <Plus size={14} /> Add more files
+              </button>
+              <input
+                ref={addFilesInputRef}
+                type="file"
+                multiple
+                className="hidden"
+                onChange={e => {
+                  if (e.target.files) handleAddFiles(e.target.files)
+                  e.target.value = ''
+                }}
+              />
+            </div>
           </div>
-        </>}
-      />
+
+          {/* Cards Grid */}
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
+            {files.map((item, idx) => (
+              <div
+                key={item.id}
+                className="group relative flex flex-col overflow-hidden rounded-[16px] border border-line-warm bg-card shadow-sm transition-all duration-200 hover:shadow-md hover:border-ink"
+              >
+                {/* Order Index badge */}
+                <span className="absolute left-2.5 top-2.5 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-black/70 font-mono text-[10px] font-bold text-white shadow">
+                  {idx + 1}
+                </span>
+
+                {/* Card Top Actions */}
+                <div className="absolute right-2 top-2 z-10 flex items-center gap-1 rounded-full bg-black/60 p-1 opacity-90 backdrop-blur transition-opacity">
+                  {item.isImage && (
+                    <button
+                      onClick={() => rotateFile(item.id)}
+                      className="grid h-6 w-6 place-items-center rounded-full text-white hover:bg-white/20"
+                      title="Rotate 90°"
+                    >
+                      <RotateCw size={12} />
+                    </button>
+                  )}
+                  <button
+                    onClick={() => removeFile(item.id)}
+                    className="grid h-6 w-6 place-items-center rounded-full text-white hover:bg-red-600"
+                    title="Remove"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+
+                {/* Thumbnail Preview Area */}
+                <div className="flex h-48 items-center justify-center overflow-hidden bg-msurf p-3">
+                  {item.isImage ? (
+                    <img
+                      src={item.previewUrl}
+                      alt={item.name}
+                      style={{ transform: `rotate(${item.rotation}deg)` }}
+                      className="max-h-full max-w-full rounded object-contain transition-transform duration-200"
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center gap-2 text-muted">
+                      <FileText size={36} />
+                      <span className="font-mono text-[10px] uppercase">{item.name.split('.').pop()}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Card Footer with Details & Reorder Arrows */}
+                <div className="flex items-center justify-between border-t border-line-warm bg-card px-3 py-2">
+                  <div className="min-w-0 pr-2">
+                    <p className="truncate text-xs font-semibold" title={item.name}>{item.name}</p>
+                    <p className="font-mono text-[10px] text-muted">{item.size}</p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <button
+                      disabled={idx === 0}
+                      onClick={() => moveFile(idx, -1)}
+                      className="grid h-6 w-6 place-items-center rounded border border-line bg-msurf text-muted hover:border-ink hover:text-ink disabled:opacity-30"
+                      title="Move Left"
+                    >
+                      <ArrowLeft size={11} />
+                    </button>
+                    <button
+                      disabled={idx === files.length - 1}
+                      onClick={() => moveFile(idx, 1)}
+                      className="grid h-6 w-6 place-items-center rounded border border-line bg-msurf text-muted hover:border-ink hover:text-ink disabled:opacity-30"
+                      title="Move Right"
+                    >
+                      <ArrowRight size={11} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {/* Quick Add More Tile */}
+            <div
+              onClick={() => addFilesInputRef.current?.click()}
+              className="flex min-h-[190px] cursor-pointer flex-col items-center justify-center gap-2 rounded-[16px] border-2 border-dashed border-line-warm bg-msurf/50 p-6 text-center transition-all duration-200 hover:border-ink hover:bg-card"
+            >
+              <span className="grid h-10 w-10 place-items-center rounded-full bg-card shadow-sm text-body">
+                <Plus size={18} />
+              </span>
+              <span className="text-xs font-semibold">Add more</span>
+            </div>
+          </div>
+        </Card>
+
+        {/* Right: Options Panel (styled just like iLovePDF) */}
+        <Card className="flex flex-col justify-between gap-6 p-6">
+          <div className="flex flex-col gap-6">
+            <div>
+              <Eyebrow className="text-amber-ink">Conversion Settings</Eyebrow>
+              <h3 className="mt-1 text-xl font-bold tracking-tight">Image to {fmt} options</h3>
+            </div>
+
+            {/* Target format */}
+            <div>
+              <label className="mb-2 block font-mono text-[11px] uppercase tracking-wider text-muted">Output Format</label>
+              <Seg options={['PDF', 'DOCX', 'PNG', 'JPG', 'WEBP']} value={fmt} onChange={setFmt} />
+            </div>
+
+            {/* Page Orientation */}
+            {fmt === 'PDF' && (
+              <div>
+                <label className="mb-2 block font-mono text-[11px] uppercase tracking-wider text-muted">Page orientation</label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => setOrientation('portrait')}
+                    className={`flex flex-col items-center justify-center gap-2 rounded-[14px] border p-4 transition-all ${
+                      orientation === 'portrait' ? 'border-red-600 bg-red-600/5 text-red-600 font-semibold shadow-sm' : 'border-line-warm bg-card text-body hover:border-ink'
+                    }`}
+                  >
+                    <div className="h-8 w-6 rounded border-2 border-current" />
+                    <span className="text-xs">Portrait</span>
+                  </button>
+                  <button
+                    onClick={() => setOrientation('landscape')}
+                    className={`flex flex-col items-center justify-center gap-2 rounded-[14px] border p-4 transition-all ${
+                      orientation === 'landscape' ? 'border-red-600 bg-red-600/5 text-red-600 font-semibold shadow-sm' : 'border-line-warm bg-card text-body hover:border-ink'
+                    }`}
+                  >
+                    <div className="h-6 w-8 rounded border-2 border-current" />
+                    <span className="text-xs">Landscape</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Page Size */}
+            {fmt === 'PDF' && (
+              <div>
+                <label className="mb-2 block font-mono text-[11px] uppercase tracking-wider text-muted">Page size</label>
+                <select
+                  value={pageSize}
+                  onChange={e => setPageSize(e.target.value)}
+                  className="w-full rounded-[12px] border border-line-warm bg-msurf px-3 py-2.5 text-xs font-mono focus:border-ink focus:outline-none"
+                >
+                  <option value="A4 (297x210 mm)">A4 (297x210 mm)</option>
+                  <option value="US Letter">US Letter (8.5x11 in)</option>
+                  <option value="Fit (same as image)">Fit (same as image)</option>
+                </select>
+              </div>
+            )}
+
+            {/* Margin */}
+            {fmt === 'PDF' && (
+              <div>
+                <label className="mb-2 block font-mono text-[11px] uppercase tracking-wider text-muted">Margin</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['none', 'small', 'big'] as const).map(m => (
+                    <button
+                      key={m}
+                      onClick={() => setMargin(m)}
+                      className={`rounded-[10px] border py-2 text-center font-mono text-xs capitalize transition-all ${
+                        margin === m ? 'border-red-600 bg-red-600/5 text-red-600 font-semibold' : 'border-line-warm bg-card text-body hover:border-ink'
+                      }`}
+                    >
+                      {m === 'none' ? 'No margin' : m}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Merge Checkbox */}
+            {fmt === 'PDF' && files.length > 1 && (
+              <label className="flex cursor-pointer items-center gap-3 rounded-[12px] border border-line-warm bg-msurf p-3 text-xs font-medium">
+                <input
+                  type="checkbox"
+                  checked={mergeAll}
+                  onChange={e => setMergeAll(e.target.checked)}
+                  className="h-4 w-4 rounded accent-red-600"
+                />
+                <span>Merge all images in one PDF file</span>
+              </label>
+            )}
+          </div>
+
+          {/* Big Prominent Action Button */}
+          <button
+            onClick={runConversion}
+            disabled={isConverting}
+            className="flex w-full items-center justify-center gap-2 rounded-[14px] bg-red-600 py-4 font-bold text-white shadow-lg shadow-red-600/30 transition-all hover:bg-red-700 hover:scale-[1.01] disabled:opacity-50"
+          >
+            {isConverting ? (
+              <span>Converting...</span>
+            ) : (
+              <>
+                <span>Convert to {fmt}</span>
+                <ArrowRight size={18} />
+              </>
+            )}
+          </button>
+        </Card>
+      </div>
     </>
   )
 }
