@@ -8,11 +8,35 @@ import { ATS, Compressor, Converter, Deepfake, History, Passport, Summarizer } f
 
 const PAGES = { converter: Converter, compressor: Compressor, ats: ATS, passport: Passport, summarizer: Summarizer, deepfake: Deepfake, history: History, team: Team }
 
+const VALID_PAGES: PageId[] = ['converter', 'compressor', 'ats', 'passport', 'summarizer', 'deepfake', 'history', 'team']
+
+const getInitialPage = (): PageId => {
+  const hash = window.location.hash.replace('#', '') as PageId
+  if (hash && VALID_PAGES.includes(hash)) return hash
+  return 'home'
+}
+
 export default function App() {
-  const [stack, setStack] = useState<PageId[]>(['home'])
+  const [stack, setStack] = useState<PageId[]>(() => {
+    const init = getInitialPage()
+    return init === 'home' ? ['home'] : ['home', init]
+  })
   const page = stack[stack.length - 1]
   const [dark, setDark] = useState(false)
   const [splash, setSplash] = useState<'on' | 'leaving' | 'off'>('on')
+
+  useEffect(() => {
+    const handleHash = () => {
+      const h = window.location.hash.replace('#', '') as PageId
+      if (h && VALID_PAGES.includes(h)) {
+        setStack(['home', h])
+      } else if (!h || h === 'home') {
+        setStack(['home'])
+      }
+    }
+    window.addEventListener('hashchange', handleHash)
+    return () => window.removeEventListener('hashchange', handleHash)
+  }, [])
 
   useEffect(() => {
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -33,14 +57,18 @@ export default function App() {
 
   const go = (p: PageId) => {
     if (p === page) return
+    window.location.hash = p === 'home' ? '' : p
     setSplash('on')
     setStack(s => [...s, p])
     window.scrollTo({ top: 0, behavior: 'instant' })
   }
   const back = () => {
     if (stack.length <= 1) return
+    const nextStack = stack.slice(0, -1)
+    const prevPage = nextStack[nextStack.length - 1]
+    window.location.hash = prevPage === 'home' ? '' : prevPage
     setSplash('on')
-    setStack(s => s.slice(0, -1))
+    setStack(nextStack)
     window.scrollTo({ top: 0, behavior: 'instant' })
   }
   const prev = stack[stack.length - 2]
