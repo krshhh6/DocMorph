@@ -127,7 +127,7 @@ def check_gemini_sparkle(img_bgr: np.ndarray):
     else:
         sym = 0.0
 
-    is_wm = (sc >= 0.80 and lift >= 12.0) or (sc >= 0.75 and lift >= 25.0) or (sc >= 0.88)
+    is_wm = (sc >= 0.83 and lift >= 15.0 and sym >= 0.65) or (sc >= 0.91)
     label = "Google Gemini Sparkle" if is_wm else "None"
     return is_wm, sc, label
 

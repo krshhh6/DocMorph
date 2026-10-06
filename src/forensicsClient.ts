@@ -260,7 +260,7 @@ export async function detectGeminiSparkle(img: HTMLImageElement): Promise<{ hasW
       }
     }
 
-    const isWm = (bestSc >= 0.80 && bestLift >= 12.0) || (bestSc >= 0.75 && bestLift >= 25.0) || (bestSc >= 0.88)
+    const isWm = (bestSc >= 0.83 && bestLift >= 15.0 && bestSym >= 0.65) || (bestSc >= 0.91)
     return { hasWatermark: isWm, score: Math.max(0, bestSc) }
   } catch (e) {
     return { hasWatermark: false, score: 0 }
