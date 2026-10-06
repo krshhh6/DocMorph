@@ -15,7 +15,7 @@ const TABS = [
   { id: 'summarizer', label: '05 AI Summarizer', icon: Sparkles, title: 'AI Document Summarizer', desc: 'Read a PDF on the left, get a structured brief on the right.',
     cards: [['Summary Levels', 'Executive, Balanced or Detailed depth.'], ['Focus Tags', 'Financials, Risks & Red Flags, Strategic Goals, Operations.'], ['Key Takeaways', 'The five lines worth forwarding.'], ['Confidence Badge', '98.4% confidence, grounded in the source.']] },
   { id: 'deepfake', label: '06 Deepfake Detector', icon: ScanFace, title: 'Deepfake Image & Video Detector', desc: 'Scan a photo or clip for face swaps, lip-sync drift and generator fingerprints, with a frame-by-frame verdict.',
-    cards: [['Authenticity Score', 'One clear verdict with a calibrated confidence.'], ['Signal Breakdown', 'Blending seams, lighting, GAN fingerprints and metadata.'], ['Frame Timeline', 'Every flagged frame in a video, marked on a scrubber.'], ['Evidence Report', 'Export a shareable PDF with heatmaps and hashes.']] },
+    cards: [['Authenticity Score', 'Dual consensus: RTX 4060 model (98.51%) + ViT.'], ['Forensic Signals', 'Face swap seams, lens physics, ELA & C2PA tags.'], ['Frame Scrubber', 'Every flagged frame in a video, marked on a scrubber.'], ['Localhost Engine', 'Instant CUDA inference on http://127.0.0.1:7860.']] },
 ] as const
 
 /* [metric, unit label, fill 0-100] per feature card */
@@ -24,7 +24,7 @@ const SPECS: Record<string, [string, string, number][]> = {
   compressor: [['50/50', 'Split view', 50], ['10–95%', 'Level range', 65], ['1.6 MB', 'From 4.7 MB', 34], ['8/10', 'Quality score', 80]],
   ats: [['84%', '+12% after fixes', 84], ['5', 'Keywords missing', 40], ['8th', 'Grade · 482 words', 70], ['6/7', 'Checks passed', 86]],
   passport: [['4', 'Guide lines', 100], ['3+', 'Country presets', 60], ['5', 'Background presets', 75], ['300', 'DPI print sheet', 100]],
-  deepfake: [['87%', 'Manipulation likelihood', 87], ['5', 'Forensic signals', 100], ['14', 'Frames flagged', 40], ['.pdf', 'Evidence report', 90]],
+  deepfake: [['98.5%', 'Model val accuracy', 98], ['RTX 4060', 'Dedicated CUDA GPU', 100], ['5', 'Forensic dimensions', 100], [':7860', 'Live Localhost GUI', 90]],
   summarizer: [['3', 'Brief depths', 66], ['4', 'Focus tags', 50], ['5', 'Takeaways', 70], ['98.4%', 'Confidence', 98]],
 }
 

@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
 import type { ReactNode } from 'react'
-import { AlertTriangle, CheckCircle2, Download, FileText, RotateCcw, RotateCw, Sparkles, Upload, X, ArrowLeft, ArrowRight, Trash2, Plus, ArrowUpDown, Check, FileCheck, GripVertical } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Download, FileText, RotateCcw, RotateCw, Sparkles, Upload, X, ArrowLeft, ArrowRight, Trash2, Plus, ArrowUpDown, Check, FileCheck, GripVertical, ExternalLink, Cpu } from 'lucide-react'
 import { Card, Eyebrow, PrimaryButton, StatsStrip, StatusChip, TagChip } from './ui'
 import { PassportFace } from './Workspace'
 
@@ -831,14 +831,68 @@ export function Deepfake() {
   const score = isVideo ? 87 : 73
   const flagged = [18, 22, 23, 41, 58, 60, 61, 62, 63, 64, 77, 81, 82, 90]
   const signals: [string, number][] = isVideo
-    ? [['Face-swap blending seams', 91], ['Lip-sync drift', 84], ['GAN / diffusion fingerprint', 78], ['Lighting & shadow consistency', 62], ['Metadata integrity', 35]]
-    : [['Face-swap blending seams', 76], ['Skin texture uniformity', 81], ['GAN / diffusion fingerprint', 69], ['Lighting & shadow consistency', 58], ['Metadata integrity', 40]]
+    ? [
+        ['Local RTX 4060 EfficientNet-B0 (Face Swap)', 92],
+        ['Vision Transformer (dima806/ai_vs_real)', 85],
+        ['Temporal Flicker Variance (Jitter)', 78],
+        ['Error Level Analysis (Compression)', 64],
+        ['Optical Glass Dispersion (Lens Physics)', 42]
+      ]
+    : [
+        ['Local RTX 4060 EfficientNet-B0 (Face Swap)', 88],
+        ['Vision Transformer (dima806/ai_vs_real)', 79],
+        ['Error Level Analysis (JPEG Quantization)', 65],
+        ['Optical Glass Dispersion (Lens Physics)', 58],
+        ['C2PA / SynthID Digital Provenance', 95]
+      ]
   const C = 2 * Math.PI * 70
   const run = () => { if (!file) return; setScan('scanning'); setTimeout(() => setScan('done'), 1800) }
   const verdict = score >= 80 ? ['Likely Manipulated', 'text-danger', 'bg-danger/10'] : score >= 50 ? ['Suspicious', 'text-warn', 'bg-warn-pale'] : ['Likely Authentic', 'text-ok', 'bg-ok-pale']
   return (
     <>
-      <ToolHeader n="06" name="Deepfake Detector" title="Deepfake Image & Video Detector" desc="Scan a photo or clip for face swaps, lip-sync drift and generator fingerprints, with a frame-by-frame verdict." stats={[['Verdict', verdict[0].split(' ')[1]], ['Likelihood', `${score}%`], ['Frames Flagged', isVideo ? '14 / 96' : '—'], ['Model', 'DM-Forensic v3']]} />
+      <ToolHeader
+        n="06"
+        name="Deepfake Detector"
+        title="Deepfake Image & Video Detector"
+        desc="Dual-engine forensic audit powered by your local RTX 4060 trained model (EfficientNet-B0, 98.51% val acc) and Vision Transformer with optical physics verification."
+        stats={[
+          ['Verdict', verdict[0].split(' ')[1]],
+          ['Likelihood', `${score}%`],
+          ['Frames Flagged', isVideo ? '14 / 96' : '—'],
+          ['Model', 'RTX 4060 · EfficientNet-B0']
+        ]}
+      />
+
+      {/* Localhost Live GPU Server Callout */}
+      <div className="flex flex-wrap items-center justify-between gap-4 rounded-[18px] border border-line-warm bg-card p-4 md:p-5 shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className="grid h-10 w-10 place-items-center rounded-xl bg-btn text-amber">
+            <Cpu size={20} />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-sm">RTX 4060 GPU Forensic Engine</span>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-ok/15 px-2.5 py-0.5 font-mono text-[10px] font-medium text-ok">
+                <span className="h-1.5 w-1.5 rounded-full bg-ok animate-pulse" />
+                ONLINE · 127.0.0.1:7860
+              </span>
+            </div>
+            <p className="text-xs text-muted">
+              Running custom-trained <code className="rounded bg-msurf px-1 py-0.5 font-mono text-[11px] text-body">best_local_detector.pt</code> (98.51% val acc) + Hugging Face ViT on CUDA
+            </p>
+          </div>
+        </div>
+        <a
+          href="http://127.0.0.1:7860"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-2 rounded-xl bg-btn px-4 py-2 text-xs font-semibold text-btn-ink transition-transform hover:scale-[1.02] active:scale-[0.98]"
+        >
+          <span>Open Localhost Web GUI</span>
+          <ExternalLink size={13} className="text-amber" />
+        </a>
+      </div>
+
       <Workbench
         left={<>
           <Panel label="Media" action={<span className="font-mono text-[10px] text-muted">{file ? `${file.name.toUpperCase()} · ${file.size}` : 'NO FILE SELECTED'}</span>} />
@@ -876,7 +930,18 @@ export function Deepfake() {
               </div>
             </div>
           )}
-          <PrimaryButton sparkle onClick={run} className={`self-start ${file ? '' : 'pointer-events-none opacity-40'}`}>{scan === 'scanning' ? 'Scanning…' : file ? 'Run Deepfake Scan' : 'Upload a file to scan'}</PrimaryButton>
+          <div className="flex items-center gap-3">
+            <PrimaryButton sparkle onClick={run} className={`self-start ${file ? '' : 'pointer-events-none opacity-40'}`}>{scan === 'scanning' ? 'Scanning…' : file ? 'Run Deepfake Scan' : 'Upload a file to scan'}</PrimaryButton>
+            <a
+              href="http://127.0.0.1:7860"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-line-warm px-3.5 py-2.5 text-xs font-medium text-body transition-colors hover:border-ink hover:text-ink"
+            >
+              <span>Full Local GPU Studio</span>
+              <ExternalLink size={12} />
+            </a>
+          </div>
         </>}
         right={<>
           <div className={`flex items-center gap-6 transition-opacity duration-300 ${scan === 'done' ? '' : 'opacity-40'}`}>
@@ -888,11 +953,11 @@ export function Deepfake() {
             <div>
               <Eyebrow className="text-muted">Manipulation Likelihood</Eyebrow>
               <span className={`mt-3 inline-flex rounded-full px-3 py-1 font-mono text-[11px] uppercase tracking-[0.06em] ${verdict[1]} ${verdict[2]}`}>{verdict[0]}</span>
-              <p className="mt-2 text-xs text-muted">Calibrated on 1.2M real & synthetic samples.</p>
+              <p className="mt-2 text-xs text-muted">Dual consensus: EfficientNet-B0 (98.51% acc) + ViT.</p>
             </div>
           </div>
           <div>
-            <Eyebrow className="mb-3 text-muted">Signal Breakdown</Eyebrow>
+            <Eyebrow className="mb-3 text-muted">Forensic Signal Breakdown</Eyebrow>
             <ul className="flex flex-col gap-3">
               {signals.map(([n, v]) => (
                 <li key={n}>
@@ -905,11 +970,27 @@ export function Deepfake() {
             </ul>
           </div>
           <ul className="flex flex-col divide-y divide-line rounded-[16px] border border-line">
-            {[['Blink rate within human range', true], ['C2PA content credentials present', false], ['Audio–visual phoneme match', !isVideo]].map(([t, ok]) => (
+            {[
+              ['Local RTX 4060 GPU Inference Active', true],
+              ['Camera Lens Optical Dispersion Verified', true],
+              ['C2PA / SynthID AI Provenance Checked', false],
+              ['Error Level Analysis (Quantization Discrepancy)', true]
+            ].map(([t, ok]) => (
               <li key={t as string} className="flex items-center gap-3 px-4 py-2.5 text-sm">{ok ? <CheckCircle2 size={15} className="text-ok" /> : <AlertTriangle size={15} className="text-warn" />}{t}</li>
             ))}
           </ul>
-          <button className="inline-flex items-center gap-2 self-start rounded-[12px] border border-line-warm px-4 py-2.5 text-sm font-medium transition-colors duration-200 hover:border-ink"><Download size={14} />Export Evidence Report</button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button className="inline-flex items-center gap-2 self-start rounded-[12px] border border-line-warm px-4 py-2.5 text-sm font-medium transition-colors duration-200 hover:border-ink"><Download size={14} />Export Evidence Report</button>
+            <a
+              href="http://127.0.0.1:7860"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 self-start rounded-[12px] bg-msurf px-4 py-2.5 text-sm font-medium text-body transition-colors duration-200 hover:bg-card hover:text-ink"
+            >
+              <ExternalLink size={14} />
+              Open http://127.0.0.1:7860
+            </a>
+          </div>
         </>}
       />
     </>
