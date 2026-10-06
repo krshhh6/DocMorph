@@ -22,7 +22,7 @@ Everyday digital tasks force students, professionals, and recruiters across doze
 ## 🚀 Core Capabilities
 
 ### 1. 🛡️ Multi-Modal Deepfake Forensic Detector *(Flagship AI Engine)*
-- **Dual-Model Neural Classification**: Fine-tuned Vision Transformer (`dima806/ai_vs_real_image_detection`) and EfficientNet-B0 running on CUDA-accelerated local GPUs (NVIDIA GeForce RTX 4060).
+- **Dual-Model Neural Classification**: Fine-tuned Vision Transformer (`dima806/ai_vs_real_image_detection`) and EfficientNet-B0 running on hardware-accelerated GPUs and Web-optimized inference engines.
 - **7-Layer Image Audit**:
   - **C2PA Provenance Manifests**: Cryptographic signature validation for synthetic media origin (OpenAI DALL-E, Midjourney, Google Imagen).
   - **Hardware Sensor & EXIF Analysis**: Camera make/model verification vs. web export sanitization.

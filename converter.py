@@ -4,8 +4,16 @@ import subprocess
 import tempfile
 import zipfile
 from PIL import Image
-import fitz  # PyMuPDF
-from pdf2docx import Converter as PDF2DocxConverter
+try:
+    import fitz  # PyMuPDF
+except ImportError:
+    fitz = None
+
+try:
+    from pdf2docx import Converter as PDF2DocxConverter
+except ImportError:
+    PDF2DocxConverter = None
+
 
 def convert_docx_to_pdf(input_bytes: bytes) -> bytes:
     """Converts DOCX to PDF using LibreOffice headless (Linux/Docker) or docx2pdf (Windows)."""

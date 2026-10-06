@@ -60,6 +60,16 @@ async def merge_images_to_pdf_endpoint(
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+@app.post("/api/forensics/scan-image")
+async def scan_image_endpoint(file: UploadFile = File(...)):
+    try:
+        from forensics.engine import audit_image_bytes
+        raw_bytes = await file.read()
+        res = audit_image_bytes(raw_bytes, file.filename or "image.jpg")
+        return res
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run("server:app", host="0.0.0.0", port=port)

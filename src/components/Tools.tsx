@@ -3,6 +3,8 @@ import type { ReactNode } from 'react'
 import { AlertTriangle, CheckCircle2, Download, FileText, RotateCcw, RotateCw, Sparkles, Upload, X, ArrowLeft, ArrowRight, Trash2, Plus, ArrowUpDown, Check, FileCheck, GripVertical, ExternalLink, Cpu } from 'lucide-react'
 import { Card, Eyebrow, PrimaryButton, StatsStrip, StatusChip, TagChip } from './ui'
 import { PassportFace } from './Workspace'
+import { auditImageClient } from '../forensicsClient'
+
 
 function ToolHeader({ n, name, title, desc, stats }: { n: string; name: string; title: string; desc: string; stats: [string, string][] }) {
   return (
@@ -865,145 +867,60 @@ export function Deepfake() {
     if (!file) return
     setScan('scanning')
 
-    // Read byte headers to inspect for C2PA, SynthID, or AI tokens client-side
-    const buf = await file.raw.slice(0, 300000).arrayBuffer()
-    const textDecoder = new TextDecoder('iso-8859-1')
-    const headerStr = textDecoder.decode(buf).toLowerCase()
+    // 1. Try Backend Forensics API (localhost:8000 when local, or Railway when deployed)
+    try {
+      const formData = new FormData()
+      formData.append('file', file.raw)
 
-    const hasC2PA = headerStr.includes('c2pa')
-    const hasSynthID = headerStr.includes('synthid')
-    const hasDallE = headerStr.includes('dall-e') || headerStr.includes('dall·e') || headerStr.includes('openai')
-    const hasMidjourney = headerStr.includes('midjourney') || headerStr.includes('stablediffusion')
-
-    // Check camera EXIF brand tags
-    const camKeywords = ['iphone', 'apple', 'samsung', 'google', 'pixel', 'xiaomi', 'oneplus', 'canon', 'nikon', 'sony']
-    let detectedCamera: string | null = null
-    for (const brand of camKeywords) {
-      if (headerStr.includes(brand)) {
-        detectedCamera = brand.charAt(0).toUpperCase() + brand.slice(1)
-        break
+      const backendCandidates: string[] = []
+      if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+        backendCandidates.push('http://localhost:8000')
       }
+      backendCandidates.push(BACKEND_URL)
+
+      for (const base of backendCandidates) {
+        try {
+          const res = await fetch(`${base}/api/forensics/scan-image`, {
+            method: 'POST',
+            body: formData,
+            signal: AbortSignal.timeout(6000),
+          })
+          if (res.ok) {
+            const data = await res.json()
+            setResult({
+              verdict: data.verdict,
+              verdictType: data.verdictType || (data.verdict.includes('Confirmed') || data.verdict.includes('Deepfake') ? 'danger' : data.verdict.includes('Likely') ? 'warn' : 'ok'),
+              risk: data.risk,
+              realProb: data.realProb,
+              summary: data.summary,
+              details: data.details,
+            })
+            setScan('done')
+            return
+          }
+        } catch (_) {
+          // Continue to next candidate or client engine
+        }
+      }
+    } catch (_) {
+      // Backend not reached, fall back to in-browser algorithmic engine
     }
 
-    // Realistic scanning duration: 3.5 seconds
-    setTimeout(() => {
-      let aiRisk = 58.6
-      let localSwapRisk = 0.1
-      let watermarkStr = 'None'
-      let watermarkDiag = 'Clean'
-      let watermarkType: 'danger' | 'warn' | 'ok' | 'info' = 'ok'
-      let elaStr = 'Uniform compression'
-      let elaDiag = 'Original (No Splicing)'
-      let elaType: 'danger' | 'warn' | 'ok' | 'info' = 'ok'
-      let lensStr = 'Natural lens blur'
-      let lensDiag = 'Real Camera Lens'
-      let lensType: 'danger' | 'warn' | 'ok' | 'info' = 'ok'
-      let camStr = detectedCamera ? `${detectedCamera} Camera` : 'None'
-      let camDiag = detectedCamera ? `Camera: ${detectedCamera}` : 'No Device Info (Web / App)'
-      let c2paStr = 'None'
-      let c2paDiag = 'No AI Tag'
-      let c2paType: 'danger' | 'warn' | 'ok' | 'info' = 'info'
-      let summary = ''
-      let verdictTitle = ''
-      let verdictType: 'danger' | 'warn' | 'ok' = 'warn'
-
-      if (hasC2PA || hasSynthID || hasDallE || hasMidjourney) {
-        aiRisk = 99.8
-        c2paStr = hasC2PA ? 'C2PA Content Credentials' : hasSynthID ? 'Google SynthID' : 'OpenAI DALL-E Tag'
-        c2paDiag = 'AI Digital Signature Found'
-        c2paType = 'danger'
-        verdictTitle = 'Confirmed AI Generated'
-        verdictType = 'danger'
-        summary = `Official AI digital signature detected: ${c2paStr}.`
-      } else if (file.name.toLowerCase().includes('woman') || file.name.toLowerCase().includes('playstation') || file.name.toLowerCase().includes('2k')) {
-        // Matching test sample from user's inspection screenshot
-        aiRisk = 58.6
-        localSwapRisk = 0.1
-        verdictTitle = 'Likely AI Generated'
-        verdictType = 'warn'
-        summary = `AI generator patterns detected (${aiRisk.toFixed(1)}% risk).`
-      } else if (detectedCamera) {
-        aiRisk = 4.2
-        localSwapRisk = 1.0
-        verdictTitle = 'Authentic Real Photograph'
-        verdictType = 'ok'
-        summary = `Original camera hardware confirmed: ${detectedCamera}.`
-      } else if (file.name.toLowerCase().includes('face') || file.name.toLowerCase().includes('deepfake')) {
-        aiRisk = 88.4
-        localSwapRisk = 91.2
-        verdictTitle = 'AI Deepfake (Face Swap)'
-        verdictType = 'danger'
-        summary = `Face swap detected: Facial features show digital tampering (${localSwapRisk.toFixed(1)}% confidence).`
-      } else {
-        // Natural default audit
-        aiRisk = isVideo ? 68.4 : 52.0
-        localSwapRisk = 2.4
-        verdictTitle = aiRisk >= 50 ? 'Likely AI Generated' : 'Authentic Real Photograph'
-        verdictType = aiRisk >= 50 ? 'warn' : 'ok'
-        summary = aiRisk >= 50
-          ? `AI generator patterns detected (${aiRisk.toFixed(1)}% risk).`
-          : 'Natural camera textures and clean compression confirmed.'
-      }
-
-      const vitDiag = aiRisk >= 75 ? 'AI Generated' : aiRisk >= 50 ? 'Likely AI' : 'Real Photo'
-      const vitType: 'danger' | 'warn' | 'ok' = aiRisk >= 75 ? 'danger' : aiRisk >= 50 ? 'warn' : 'ok'
-      const deepfakeDiag = localSwapRisk >= 75 ? 'Face Swap Detected' : 'No Face Swap'
-      const deepfakeType: 'danger' | 'ok' = localSwapRisk >= 75 ? 'danger' : 'ok'
-
-      setResult({
-        verdict: verdictTitle,
-        verdictType,
-        risk: Math.round(aiRisk),
-        realProb: Math.round(100 - aiRisk),
-        summary,
-        details: [
-          {
-            test: 'AI Generator Check (Midjourney/DALL-E)',
-            reading: `${aiRisk.toFixed(1)}% AI Risk`,
-            result: vitDiag,
-            statusType: vitType
-          },
-          {
-            test: 'Face Swap / Deepfake Check',
-            reading: `${localSwapRisk.toFixed(1)}% Risk`,
-            result: deepfakeDiag,
-            statusType: deepfakeType
-          },
-          {
-            test: 'AI Watermark Scan',
-            reading: watermarkStr,
-            result: watermarkDiag,
-            statusType: watermarkType
-          },
-          {
-            test: 'Photo Editing & Splicing (ELA)',
-            reading: elaStr,
-            result: elaDiag,
-            statusType: elaType
-          },
-          {
-            test: 'Camera Lens Physics',
-            reading: lensStr,
-            result: lensDiag,
-            statusType: lensType
-          },
-          {
-            test: 'Camera Device Info',
-            reading: camStr,
-            result: camDiag,
-            statusType: detectedCamera ? 'ok' : 'info'
-          },
-          {
-            test: 'AI Digital Signature (C2PA)',
-            reading: c2paStr,
-            result: c2paDiag,
-            statusType: c2paType
-          }
-        ]
+    // 2. Client-Side Algorithmic Forensics Engine (Runs directly in browser for Vercel/offline)
+    try {
+      const img = new Image()
+      img.src = file.url
+      await new Promise(r => {
+        img.onload = r
+        img.onerror = r
       })
-
+      const clientResult = await auditImageClient(file.raw, img)
+      setResult(clientResult)
       setScan('done')
-    }, 3200)
+    } catch (err) {
+      console.error('Forensic scan error:', err)
+      setScan('done')
+    }
   }
 
   const currentScore = result ? result.risk : (isVideo ? 87 : 59)

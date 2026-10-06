@@ -3,7 +3,7 @@
 **Name:** Krishna Kant  
 **Subject:** Python Project (Semester 3)  
 **Tools:** Python, PyTorch, Hugging Face Transformers, OpenCV, Pillow  
-**Hardware:** Windows Laptop (NVIDIA RTX 4060 GPU)  
+**Hardware:** Windows PC (Dedicated GPU)  
 
 ---
 
@@ -21,7 +21,7 @@ To fix this, I made a script that does not just depend on a single model. It com
 
 I used five main Python libraries for this project:
 
-- **torch (PyTorch):** Used to run the neural network. It automatically uses my laptop's RTX 4060 GPU through CUDA so the scan takes less than a second.
+- **torch (PyTorch):** Used to run the neural network. It automatically uses hardware acceleration through CUDA so the scan takes less than a second.
 - **transformers:** Used to load the pre-trained Vision Transformer model (`dima806/ai_vs_real_image_detection`) from Hugging Face without needing to write model layers from scratch.
 - **PIL (Pillow):** Opens the image files and extracts camera EXIF tags like camera brand and model name.
 - **cv2 (OpenCV):** Used to find image edges using Canny edge detection so we can measure color fringing.
