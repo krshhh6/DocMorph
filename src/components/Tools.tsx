@@ -35,13 +35,22 @@ function Panel({ label, children, action }: { label: string; children?: ReactNod
   )
 }
 
-function Dropzone({ text }: { text: string }) {
+const BACKEND_URL = import.meta.env.VITE_API_URL || 'https://docmorph-production.up.railway.app'
+
+function Dropzone({ text, onFiles }: { text: string; onFiles?: (files: FileList) => void }) {
   return (
-    <label className="flex cursor-pointer flex-col items-center justify-center gap-3 rounded-[17.6px] border border-dashed border-line-warm bg-msurf px-6 py-10 text-center transition-colors duration-200 hover:border-ink">
+    <label
+      onDragOver={e => e.preventDefault()}
+      onDrop={e => {
+        e.preventDefault()
+        if (e.dataTransfer.files && onFiles) onFiles(e.dataTransfer.files)
+      }}
+      className="flex cursor-pointer flex-col items-center justify-center gap-3 rounded-[17.6px] border border-dashed border-line-warm bg-msurf px-6 py-10 text-center transition-colors duration-200 hover:border-ink"
+    >
       <span className="grid h-10 w-10 place-items-center rounded-[12px] bg-card"><Upload size={16} /></span>
       <span className="text-sm font-semibold">{text}</span>
       <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted">Drag & drop or browse · max 50 MB</span>
-      <input type="file" className="hidden" multiple />
+      <input type="file" className="hidden" multiple onChange={e => e.target.files && onFiles?.(e.target.files)} />
     </label>
   )
 }
@@ -56,47 +65,168 @@ function Seg({ options, value, onChange }: { options: string[]; value: string; o
   )
 }
 
+interface ConvertJob {
+  id: string
+  file?: File
+  name: string
+  from: string
+  to: string
+  size: string
+  status: 'Done' | 'Processing' | 'Queued' | 'Failed'
+  downloadUrl?: string
+  downloadName?: string
+  error?: string
+}
+
 /* 01 Converter */
 export function Converter() {
   const [fmt, setFmt] = useState('PDF')
-  const rows: [string, string, string, 'Done' | 'Processing' | 'Queued' | 'Failed'][] = [
-    ['annual-report-2026.docx', 'DOCX', '2.4 MB', 'Done'],
-    ['product-shot-03.png', 'PNG', '6.1 MB', 'Processing'],
-    ['lease-agreement.jpg', 'JPG', '1.8 MB', 'Queued'],
-    ['brand-guide.webp', 'WEBP', '940 KB', 'Queued'],
-  ]
+  const [isConverting, setIsConverting] = useState(false)
+  const [jobs, setJobs] = useState<ConvertJob[]>([
+    { id: '1', name: 'annual-report-2026.docx', from: 'DOCX', to: 'PDF', size: '2.4 MB', status: 'Done' },
+    { id: '2', name: 'product-shot-03.png', from: 'PNG', to: 'PDF', size: '6.1 MB', status: 'Queued' },
+    { id: '3', name: 'lease-agreement.jpg', from: 'JPG', to: 'PDF', size: '1.8 MB', status: 'Queued' },
+    { id: '4', name: 'brand-guide.webp', from: 'WEBP', to: 'PDF', size: '940 KB', status: 'Queued' },
+  ])
+
+  const handleFiles = (fileList: FileList) => {
+    const newJobs: ConvertJob[] = Array.from(fileList).map(f => {
+      const ext = f.name.split('.').pop()?.toUpperCase() || 'FILE'
+      const sz = f.size > 1048576 ? `${(f.size / 1048576).toFixed(1)} MB` : `${Math.round(f.size / 1024)} KB`
+      return {
+        id: Math.random().toString(36).substring(7),
+        file: f,
+        name: f.name,
+        from: ext,
+        to: fmt,
+        size: sz,
+        status: 'Queued',
+      }
+    })
+    setJobs(prev => [...newJobs, ...prev.filter(j => !j.file)])
+  }
+
+  const runConversion = async () => {
+    const pending = jobs.filter(j => j.status === 'Queued' && j.file)
+    if (pending.length === 0) {
+      alert('Please upload files to convert!')
+      return
+    }
+
+    setIsConverting(true)
+    for (const job of pending) {
+      setJobs(prev => prev.map(j => j.id === job.id ? { ...j, status: 'Processing', to: fmt } : j))
+      try {
+        const formData = new FormData()
+        formData.append('file', job.file!)
+        formData.append('target_format', fmt)
+
+        const res = await fetch(`${BACKEND_URL}/api/convert`, {
+          method: 'POST',
+          body: formData,
+        })
+
+        if (!res.ok) {
+          const errDetail = await res.text()
+          throw new Error(errDetail || 'Conversion failed')
+        }
+
+        const blob = await res.blob()
+        const downloadUrl = window.URL.createObjectURL(blob)
+        const baseName = job.name.substring(0, job.name.lastIndexOf('.')) || job.name
+        const outExt = fmt.toLowerCase() === 'jpg' ? 'jpg' : fmt.toLowerCase()
+        const downloadName = `${baseName}.${outExt}`
+
+        setJobs(prev => prev.map(j => j.id === job.id ? {
+          ...j,
+          status: 'Done',
+          to: fmt,
+          downloadUrl,
+          downloadName,
+        } : j))
+
+        const a = document.createElement('a')
+        a.href = downloadUrl
+        a.download = downloadName
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+      } catch (err: any) {
+        setJobs(prev => prev.map(j => j.id === job.id ? {
+          ...j,
+          status: 'Failed',
+          error: err.message,
+        } : j))
+      }
+    }
+    setIsConverting(false)
+  }
+
+  const doneCount = jobs.filter(j => j.status === 'Done').length
+  const pendingFilesCount = jobs.filter(j => j.file && j.status === 'Queued').length
+
   return (
     <>
-      <ToolHeader n="01" name="Universal Converter" title="Universal Converter" desc="Batch-convert documents, images and PDFs, then track every job in the log." stats={[['Formats', '5'], ['Queue Size', '4'], ['Avg Time', '1.2s'], ['Success Rate', '99.1%']]} />
+      <ToolHeader
+        n="01"
+        name="Universal Converter"
+        title="Universal Converter"
+        desc="Batch-convert documents, images and PDFs directly via your cloud Python backend."
+        stats={[
+          ['Formats', '5'],
+          ['Queue Size', `${jobs.length}`],
+          ['Completed', `${doneCount} / ${jobs.length}`],
+          ['Backend', 'Railway Online']
+        ]}
+      />
       <Workbench
         left={<>
           <Panel label="Upload" />
-          <Dropzone text="Drop files to convert" />
+          <Dropzone text="Drop files to convert" onFiles={handleFiles} />
           <Panel label="Output Format" />
           <Seg options={['PDF', 'DOCX', 'PNG', 'JPG', 'WEBP']} value={fmt} onChange={setFmt} />
-          <PrimaryButton className="self-start">Convert 4 files to {fmt}</PrimaryButton>
+          <PrimaryButton onClick={runConversion} disabled={isConverting} className="self-start">
+            {isConverting ? 'Converting...' : pendingFilesCount > 0 ? `Convert ${pendingFilesCount} files to ${fmt}` : `Upload files to convert to ${fmt}`}
+          </PrimaryButton>
         </>}
         right={<>
-          <Panel label="Conversion Queue" action={<span className="font-mono text-[10px] text-muted">1 / 4 DONE</span>} />
+          <Panel label="Conversion Queue" action={<span className="font-mono text-[10px] text-muted">{doneCount} / {jobs.length} DONE</span>} />
           <div className="overflow-x-auto rounded-[16px] border border-line">
             <table className="w-full text-sm">
               <thead className="bg-msurf font-mono text-[10px] uppercase tracking-[0.08em] text-muted">
-                <tr>{['File', 'From', 'To', 'Size', 'Status'].map(h => <th key={h} className="px-4 py-3 text-left font-medium">{h}</th>)}</tr>
+                <tr>{['File', 'From', 'To', 'Size', 'Status', 'Action'].map(h => <th key={h} className="px-4 py-3 text-left font-medium">{h}</th>)}</tr>
               </thead>
               <tbody className="divide-y divide-line">
-                {rows.map(([f, from, size, s]) => (
-                  <tr key={f}>
-                    <td className="px-4 py-3 font-medium"><span className="flex items-center gap-2"><FileText size={14} className="text-muted" />{f}</span></td>
-                    <td className="px-4 py-3 font-mono text-xs text-muted">{from}</td>
-                    <td className="px-4 py-3 font-mono text-xs">{fmt}</td>
-                    <td className="px-4 py-3 font-mono text-xs text-muted">{size}</td>
-                    <td className="px-4 py-3"><StatusChip status={s} /></td>
+                {jobs.map(job => (
+                  <tr key={job.id}>
+                    <td className="px-4 py-3 font-medium">
+                      <span className="flex items-center gap-2">
+                        <FileText size={14} className="text-muted" />
+                        <span className="max-w-[140px] truncate md:max-w-[200px]" title={job.name}>{job.name}</span>
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 font-mono text-xs text-muted">{job.from}</td>
+                    <td className="px-4 py-3 font-mono text-xs">{job.to}</td>
+                    <td className="px-4 py-3 font-mono text-xs text-muted">{job.size}</td>
+                    <td className="px-4 py-3"><StatusChip status={job.status} /></td>
+                    <td className="px-4 py-3">
+                      {job.downloadUrl ? (
+                        <a
+                          href={job.downloadUrl}
+                          download={job.downloadName}
+                          className="inline-flex items-center gap-1 font-mono text-xs text-amber-ink hover:underline"
+                        >
+                          <Download size={12} /> Save
+                        </a>
+                      ) : (
+                        <span className="text-xs text-muted">—</span>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          <button className="inline-flex items-center gap-2 self-start rounded-[12px] border border-line-warm px-4 py-2.5 text-sm font-medium transition-colors duration-200 hover:border-ink"><Download size={14} />Download all (.zip)</button>
         </>}
       />
     </>
