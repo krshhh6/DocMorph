@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
 import type { ReactNode } from 'react'
-import { AlertTriangle, CheckCircle2, Download, FileText, RotateCcw, RotateCw, Sparkles, Upload, X, ArrowLeft, ArrowRight, Trash2, Plus, ArrowUpDown, Check, FileCheck } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Download, FileText, RotateCcw, RotateCw, Sparkles, Upload, X, ArrowLeft, ArrowRight, Trash2, Plus, ArrowUpDown, Check, FileCheck, GripVertical } from 'lucide-react'
 import { Card, Eyebrow, PrimaryButton, StatsStrip, StatusChip, TagChip } from './ui'
 import { PassportFace } from './Workspace'
 
@@ -122,6 +122,20 @@ export function Converter() {
   const [isConverting, setIsConverting] = useState(false)
   const [convertedResult, setConvertedResult] = useState<ConvertedResult | null>(null)
   const addFilesInputRef = useRef<HTMLInputElement>(null)
+  const [draggedIdx, setDraggedIdx] = useState<number | null>(null)
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null)
+
+  const handleDropReorder = (fromIdx: number | null, toIdx: number) => {
+    if (fromIdx === null || fromIdx === toIdx) return
+    setFiles(prev => {
+      const next = [...prev]
+      const [movedItem] = next.splice(fromIdx, 1)
+      next.splice(toIdx, 0, movedItem)
+      return next
+    })
+    setDraggedIdx(null)
+    setDragOverIdx(null)
+  }
 
   const handleAddFiles = (fileList: FileList) => {
     const newItems: FileCardItem[] = Array.from(fileList).map(f => {
@@ -336,7 +350,7 @@ export function Converter() {
               <span className="rounded-full bg-btn text-btn-ink px-3 py-1 font-mono text-xs font-semibold">
                 {files.length} file{files.length > 1 ? 's' : ''}
               </span>
-              <span className="font-mono text-xs text-muted">Use arrows or rotate each card</span>
+              <span className="font-mono text-xs text-muted">Drag & drop cards to reorder, or use arrows</span>
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -376,12 +390,47 @@ export function Converter() {
             {files.map((item, idx) => (
               <div
                 key={item.id}
-                className="group relative flex flex-col overflow-hidden rounded-[16px] border border-line-warm bg-card shadow-sm transition-all duration-200 hover:shadow-md hover:border-ink"
+                draggable={true}
+                onDragStart={(e) => {
+                  e.dataTransfer.setData('text/plain', String(idx))
+                  e.dataTransfer.effectAllowed = 'move'
+                  setDraggedIdx(idx)
+                }}
+                onDragOver={(e) => {
+                  e.preventDefault()
+                  e.dataTransfer.dropEffect = 'move'
+                }}
+                onDragEnter={() => {
+                  if (draggedIdx !== null && draggedIdx !== idx) {
+                    setDragOverIdx(idx)
+                  }
+                }}
+                onDragLeave={() => {
+                  if (dragOverIdx === idx) {
+                    setDragOverIdx(null)
+                  }
+                }}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  handleDropReorder(draggedIdx, idx)
+                }}
+                onDragEnd={() => {
+                  setDraggedIdx(null)
+                  setDragOverIdx(null)
+                }}
+                className={`group relative flex flex-col overflow-hidden rounded-[16px] border bg-card shadow-sm transition-all duration-200 cursor-grab active:cursor-grabbing select-none ${
+                  draggedIdx === idx ? 'opacity-40 scale-95 border-dashed border-red-500' : ''
+                } ${
+                  dragOverIdx === idx ? 'ring-2 ring-red-600 scale-[1.03] border-red-600 shadow-xl z-20' : 'border-line-warm hover:shadow-md hover:border-ink'
+                }`}
               >
-                {/* Order Index badge */}
-                <span className="absolute left-2.5 top-2.5 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-black/70 font-mono text-[10px] font-bold text-white shadow">
-                  {idx + 1}
-                </span>
+                {/* Order Index badge & Drag Handle */}
+                <div className="absolute left-2.5 top-2.5 z-10 flex items-center gap-1 rounded-full bg-black/75 px-2 py-0.5 text-white shadow backdrop-blur">
+                  <GripVertical size={11} className="text-white/70" />
+                  <span className="font-mono text-[10px] font-bold">
+                    {idx + 1}
+                  </span>
+                </div>
 
                 {/* Card Top Actions */}
                 <div className="absolute right-2 top-2 z-10 flex items-center gap-1 rounded-full bg-black/60 p-1 opacity-90 backdrop-blur transition-opacity">
