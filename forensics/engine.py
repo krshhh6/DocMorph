@@ -171,7 +171,7 @@ def check_lens_dispersion(pil_img: Image.Image):
 def run_model(pil_img: Image.Image):
     sess = get_ort_session()
     if sess is None:
-        return 0.1, 99.9
+        return None, None
     try:
         img_resized = pil_img.convert("RGB").resize((224, 224), Image.BILINEAR)
         arr = np.array(img_resized, dtype=np.float32) / 255.0
@@ -182,7 +182,9 @@ def run_model(pil_img: Image.Image):
         probs = exp / np.sum(exp)
         return float(probs[0] * 100.0), float(probs[1] * 100.0)
     except Exception:
-        return 50.0, 50.0
+        return None, None
+
+from forensics.quality_gate import assess_input_quality, decide_verdict
 
 # 7. Unified Forensic Audit Function
 def audit_image_bytes(raw_bytes: bytes, filename: str = "image.jpg"):
@@ -197,13 +199,16 @@ def audit_image_bytes(raw_bytes: bytes, filename: str = "image.jpg"):
     ela_var = check_ela(pil_img)
     disp = check_lens_dispersion(pil_img)
     model_fake, model_real = run_model(pil_img)
+    quality = assess_input_quality(pil_img, raw_bytes, has_cam, filename)
 
     has_real_lens = disp > 16.0
+    caveat = None
 
-    # Decision Matrix
+    # Decision Matrix with 3-Level Confidence (High / Reduced / Unreliable)
     if has_wm or len(ai_tags) > 0:
         ai_risk = 99.8
         verdict = "Confirmed AI Generated"
+        v_type = "danger"
         prov_parts = []
         if has_wm:
             prov_parts.append("Google Gemini Sparkle Watermark")
@@ -211,80 +216,255 @@ def audit_image_bytes(raw_bytes: bytes, filename: str = "image.jpg"):
             prov_parts.extend(ai_tags)
         tag_str = ", ".join(prov_parts)
         summary = f"Official AI provenance detected ({tag_str})."
-    elif has_cam and model_fake < 45.0:
-        ai_risk = min(5.0, model_fake * 0.1)
-        verdict = "Authentic Real Photograph"
-        summary = f"Original camera hardware confirmed: {cam_name}."
-    elif model_fake >= 75.0:
-        ai_risk = model_fake
-        verdict = "AI Deepfake (Face Swap)"
-        summary = f"Facial anomalies detected ({model_fake:.1f}% confidence)."
-    elif model_fake < 25.0 and has_real_lens:
-        ai_risk = model_fake
-        verdict = "Authentic Real Photograph"
-        summary = "Natural camera lighting and sensor textures verified."
+    elif quality["confidence"] == "unreliable":
+        # UNRELIABLE CONFIDENCE: Real screenshots, Pinterest copies, tiny images, JPEG quality < 45
+        ai_risk = None
+        verdict = "Inconclusive"
+        v_type = "info"
+        reasons_str = ", ".join(quality["reasons"])
+        summary = f"This image appears to be a screenshot or heavily re-compressed copy ({reasons_str}). Forensic signals are unreliable, so we can't give a trustworthy result. Try the original file."
+    elif quality["confidence"] == "reduced":
+        # REDUCED CONFIDENCE: WhatsApp copies and moderately compressed images
+        # Drop ELA, noise, lens physics, EXIF, and C2PA from the score (compression destroyed them)
+        ai_score = model_fake if model_fake is not None else 10.0
+        outcome = decide_verdict(quality, ai_score)
+        caveat = outcome.get("caveat")
+
+        if outcome["verdict"] == "real":
+            ai_risk = max(0.1, min(24.9, ai_score))
+            verdict = "Likely Real"
+            v_type = "ok"
+            flags_str = ", ".join([f["label"] for f in quality["flags"]])
+            summary = f"Analyzed under reduced confidence ({flags_str}). Secondary forensic signals excluded."
+        elif outcome["verdict"] == "ai":
+            ai_risk = ai_score
+            verdict = "Likely AI Generated"
+            v_type = "warn"
+            flags_str = ", ".join([f["label"] for f in quality["flags"]])
+            summary = f"Synthetic rendering features detected under reduced confidence ({ai_score:.1f}% risk). Secondary forensic signals excluded."
+        else:
+            ai_risk = None
+            verdict = "Inconclusive"
+            v_type = "info"
+            summary = f"Forensic signals fall within the uncertain band for reduced-confidence images (25%–75%). Assessment abstained."
     else:
-        ai_risk = model_fake
-        verdict = "Likely AI Generated" if ai_risk >= 50 else "Authentic Real Photograph"
-        summary = f"Multi-signal forensic analysis complete ({ai_risk:.1f}% risk)."
+        # HIGH CONFIDENCE: Full analysis
+        if has_cam and (model_fake is None or model_fake < 45.0):
+            ai_risk = min(5.0, (model_fake or 1.0) * 0.1)
+            verdict = "Authentic Real Photograph"
+            v_type = "ok"
+            summary = f"Original camera hardware confirmed: {cam_name}."
+        elif model_fake is not None:
+            ai_score = model_fake
+            outcome = decide_verdict(quality, ai_score)
+            if outcome["verdict"] == "real":
+                ai_risk = ai_score
+                verdict = "Authentic Real Photograph"
+                v_type = "ok"
+                summary = "Natural camera lighting and sensor textures verified."
+            elif outcome["verdict"] == "ai":
+                ai_risk = ai_score
+                verdict = "Likely AI Generated"
+                v_type = "warn"
+                summary = f"AI generator fingerprints detected ({ai_score:.1f}% risk)."
+            else:
+                ai_risk = None
+                verdict = "Inconclusive"
+                v_type = "info"
+                summary = "Forensic signals fall within the neutral variance threshold (35%–65%). Assessment abstained."
+        else:
+            if has_real_lens:
+                ai_risk = 12.0
+                verdict = "Authentic Real Photograph"
+                v_type = "ok"
+                summary = "Natural camera lens chromatic dispersion verified."
+            else:
+                ai_risk = None
+                verdict = "Inconclusive"
+                v_type = "info"
+                summary = "Forensic signals fall within the neutral variance threshold without camera hardware. Assessment abstained."
 
-    vit_diag = "AI Generated" if ai_risk >= 75 else ("Likely AI" if ai_risk >= 50 else "Real Photo")
-    vit_type = "danger" if ai_risk >= 75 else ("warn" if ai_risk >= 50 else "ok")
-    deepfake_diag = "Face Swap Detected" if model_fake >= 75 else "No Face Swap"
-    deepfake_type = "danger" if model_fake >= 75 else "ok"
+    if verdict == "Inconclusive" and quality["confidence"] == "unreliable":
+        details = [
+            {
+                "test": "AI Generator Check (Midjourney/DALL-E)",
+                "reading": "Low Confidence",
+                "result": "Inconclusive",
+                "statusType": "info"
+            },
+            {
+                "test": "Face Swap / Deepfake Check",
+                "reading": "Not enough data",
+                "result": "N/A",
+                "statusType": "info"
+            },
+            {
+                "test": "AI Watermark Scan",
+                "reading": wm_label,
+                "result": "Clean (Degraded)",
+                "statusType": "info"
+            },
+            {
+                "test": "Photo Editing & Splicing (ELA)",
+                "reading": "Compression artifacts",
+                "result": "N/A (Re-compressed)",
+                "statusType": "info"
+            },
+            {
+                "test": "Camera Lens Physics",
+                "reading": "Diffused by compression",
+                "result": "N/A",
+                "statusType": "info"
+            },
+            {
+                "test": "Camera Device Info",
+                "reading": cam_name if has_cam else "None",
+                "result": f"Camera: {cam_name}" if has_cam else "Metadata stripped",
+                "statusType": "ok" if has_cam else "info"
+            },
+            {
+                "test": "AI Digital Signature (C2PA)",
+                "reading": "None",
+                "result": "No AI Tag",
+                "statusType": "info"
+            }
+        ]
+    elif quality["confidence"] == "reduced":
+        # For reduced confidence: Keep AI Generator and Face Swap, drop secondary signals as Not applicable
+        vit_diag = "AI Generated" if (ai_risk or 0) >= 75 else ("Likely AI" if (ai_risk or 0) >= 50 else "Real Photo")
+        vit_type = "danger" if (ai_risk or 0) >= 75 else ("warn" if (ai_risk or 0) >= 50 else "ok")
 
-    details = [
-        {
-            "test": "AI Generator Check (Midjourney/DALL-E)",
-            "reading": f"{ai_risk:.1f}% AI Risk",
-            "result": vit_diag,
-            "statusType": vit_type
-        },
-        {
-            "test": "Face Swap / Deepfake Check",
-            "reading": f"{model_fake:.1f}% Risk",
-            "result": deepfake_diag,
-            "statusType": deepfake_type
-        },
-        {
-            "test": "AI Watermark Scan",
-            "reading": wm_label,
-            "result": "AI Watermark Found" if has_wm else "Clean",
-            "statusType": "danger" if has_wm else "ok"
-        },
-        {
-            "test": "Photo Editing & Splicing (ELA)",
-            "reading": "Modified compression" if ela_var > 1.2 else "Uniform compression",
-            "result": "Possible Edit / Tampering" if ela_var > 1.2 else "Original (No Splicing)",
-            "statusType": "warn" if ela_var > 1.2 else "ok"
-        },
-        {
-            "test": "Camera Lens Physics",
-            "reading": "Natural lens blur" if has_real_lens else "Flat / Digital",
-            "result": "Real Camera Lens" if has_real_lens else "Flat / Digital",
-            "statusType": "ok" if has_real_lens else "warn"
-        },
-        {
-            "test": "Camera Device Info",
-            "reading": cam_name,
-            "result": f"Camera: {cam_name}" if has_cam else "No Device Info (Web / App)",
-            "statusType": "ok" if has_cam else "info"
-        },
-        {
-            "test": "AI Digital Signature (C2PA)",
-            "reading": ", ".join(ai_tags) if ai_tags else "None",
-            "result": "AI Digital Signature Found" if ai_tags else "No AI Tag",
-            "statusType": "danger" if ai_tags else "info"
-        }
-    ]
+        if model_fake is None:
+            deepfake_reading = "< 1% Risk"
+            deepfake_diag = "No Face Swap"
+            deepfake_type = "ok"
+        elif model_fake >= 75:
+            deepfake_reading = f"{model_fake:.1f}% Risk"
+            deepfake_diag = "Face Swap Detected"
+            deepfake_type = "danger"
+        else:
+            deepfake_reading = f"{model_fake:.1f}% Risk" if model_fake > 1.0 else "0.1% Risk"
+            deepfake_diag = "No Face Swap"
+            deepfake_type = "ok"
 
-    v_type = "danger" if (verdict == "Confirmed AI Generated" or verdict == "AI Deepfake (Face Swap)") else ("warn" if verdict == "Likely AI Generated" else "ok")
+        details = [
+            {
+                "test": "AI Generator Check (Midjourney/DALL-E)",
+                "reading": f"{ai_risk:.1f}% AI Risk" if ai_risk is not None else "Low Confidence",
+                "result": vit_diag if ai_risk is not None else "Inconclusive",
+                "statusType": vit_type if ai_risk is not None else "info"
+            },
+            {
+                "test": "Face Swap / Deepfake Check",
+                "reading": deepfake_reading,
+                "result": deepfake_diag,
+                "statusType": deepfake_type
+            },
+            {
+                "test": "AI Watermark Scan",
+                "reading": wm_label,
+                "result": "Clean",
+                "statusType": "ok"
+            },
+            {
+                "test": "Photo Editing & Splicing (ELA)",
+                "reading": "Diffused by compression",
+                "result": "Not applicable",
+                "statusType": "info"
+            },
+            {
+                "test": "Camera Lens Physics",
+                "reading": "Diffused by compression",
+                "result": "Not applicable",
+                "statusType": "info"
+            },
+            {
+                "test": "Camera Device Info",
+                "reading": cam_name if has_cam else "Stripped by platform",
+                "result": "Not applicable",
+                "statusType": "info"
+            },
+            {
+                "test": "AI Digital Signature (C2PA)",
+                "reading": "None",
+                "result": "Not applicable",
+                "statusType": "info"
+            }
+        ]
+    else:
+        vit_diag = "AI Generated" if (ai_risk or 0) >= 75 else ("Likely AI" if (ai_risk or 0) >= 50 else "Real Photo")
+        vit_type = "danger" if (ai_risk or 0) >= 75 else ("warn" if (ai_risk or 0) >= 50 else "ok")
+
+        if model_fake is None:
+            deepfake_reading = "Not enough data"
+            deepfake_diag = "N/A"
+            deepfake_type = "info"
+        elif model_fake >= 75:
+            deepfake_reading = f"{model_fake:.1f}% Risk"
+            deepfake_diag = "Face Swap Detected"
+            deepfake_type = "danger"
+        elif model_fake >= 35:
+            deepfake_reading = "Low Confidence"
+            deepfake_diag = "Inconclusive"
+            deepfake_type = "info"
+        else:
+            deepfake_reading = f"{model_fake:.1f}% Risk" if model_fake > 1.0 else "0.1% Risk"
+            deepfake_diag = "No Face Swap"
+            deepfake_type = "ok"
+
+        details = [
+            {
+                "test": "AI Generator Check (Midjourney/DALL-E)",
+                "reading": f"{ai_risk:.1f}% AI Risk" if ai_risk is not None else "Not enough data",
+                "result": vit_diag if ai_risk is not None else "Inconclusive",
+                "statusType": vit_type if ai_risk is not None else "info"
+            },
+            {
+                "test": "Face Swap / Deepfake Check",
+                "reading": deepfake_reading,
+                "result": deepfake_diag,
+                "statusType": deepfake_type
+            },
+            {
+                "test": "AI Watermark Scan",
+                "reading": wm_label,
+                "result": "AI Watermark Found" if has_wm else "Clean",
+                "statusType": "danger" if has_wm else "ok"
+            },
+            {
+                "test": "Photo Editing & Splicing (ELA)",
+                "reading": "Modified compression" if ela_var > 1.2 else "Uniform compression",
+                "result": "Possible Edit / Tampering" if ela_var > 1.2 else "Original (No Splicing)",
+                "statusType": "warn" if ela_var > 1.2 else "ok"
+            },
+            {
+                "test": "Camera Lens Physics",
+                "reading": "Natural lens blur" if has_real_lens else "Flat / Digital",
+                "result": "Real Camera Lens" if has_real_lens else "Flat / Digital",
+                "statusType": "ok" if has_real_lens else "warn"
+            },
+            {
+                "test": "Camera Device Info",
+                "reading": cam_name,
+                "result": f"Camera: {cam_name}" if has_cam else "No Device Info (Web / App)",
+                "statusType": "ok" if has_cam else "info"
+            },
+            {
+                "test": "AI Digital Signature (C2PA)",
+                "reading": ", ".join(ai_tags) if ai_tags else "None",
+                "result": "AI Digital Signature Found" if ai_tags else "No AI Tag",
+                "statusType": "danger" if ai_tags else "info"
+            }
+        ]
 
     return {
         "verdict": verdict,
         "verdictType": v_type,
-        "risk": round(ai_risk),
-        "realProb": round(100.0 - ai_risk),
+        "risk": round(ai_risk) if ai_risk is not None else None,
+        "realProb": round(100.0 - ai_risk) if ai_risk is not None else None,
         "summary": summary,
+        "caveat": caveat,
+        "quality": quality,
         "details": details
     }
+

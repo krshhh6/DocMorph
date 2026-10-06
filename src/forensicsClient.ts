@@ -8,6 +8,9 @@
  * 5. Optical Glass Dispersion Analysis
  */
 
+import { assessInputQuality, decideVerdict } from './qualityGate'
+import type { QualityReport } from './qualityGate'
+
 export interface ForensicDetail {
   test: string
   reading: string
@@ -17,10 +20,12 @@ export interface ForensicDetail {
 
 export interface ForensicResult {
   verdict: string
-  verdictType: 'danger' | 'warn' | 'ok'
-  risk: number
-  realProb: number
+  verdictType: 'danger' | 'warn' | 'ok' | 'info'
+  risk: number | null
+  realProb: number | null
   summary: string
+  caveat?: string | null
+  quality?: QualityReport
   details: ForensicDetail[]
 }
 
@@ -366,11 +371,13 @@ export async function auditImageClient(file: File, img: HTMLImageElement): Promi
 
   const { hasRealLens } = checkLensDispersionClient(img)
   const hasWm = wmResult.hasWatermark
+  const quality = await assessInputQuality(img, file, camData.hasCamera)
 
-  let aiRisk = 12.0
+  let aiRisk: number | null = 10.0
   let verdict = 'Authentic Real Photograph'
-  let verdictType: 'danger' | 'warn' | 'ok' = 'ok'
+  let verdictType: 'danger' | 'warn' | 'ok' | 'info' = 'ok'
   let summary = ''
+  let caveat: string | null = null
 
   if (hasWm || aiTags.length > 0) {
     aiRisk = 99.8
@@ -380,40 +387,204 @@ export async function auditImageClient(file: File, img: HTMLImageElement): Promi
     if (hasWm) provParts.push('Google Gemini Sparkle Watermark')
     if (aiTags.length > 0) provParts.push(...aiTags)
     summary = `Official AI provenance detected (${provParts.join(', ')}).`
-  } else if (camData.hasCamera) {
-    aiRisk = 4.2
-    verdict = 'Authentic Real Photograph'
-    verdictType = 'ok'
-    summary = `Original camera hardware confirmed: ${camData.cameraName}.`
-  } else if (elaVar > 1.3) {
-    aiRisk = 72.4
-    verdict = 'Likely AI Generated'
-    verdictType = 'warn'
-    summary = 'Compression inconsistency detected across image blocks.'
+  } else if (quality.confidence === 'unreliable') {
+    // UNRELIABLE CONFIDENCE: Real screenshots, Pinterest copies, tiny images, JPEG quality < 45
+    aiRisk = null
+    verdict = 'Inconclusive'
+    verdictType = 'info'
+    const reasonsStr = quality.flags.map(f => f.label).join(', ')
+    summary = `This image appears to be a screenshot or heavily re-compressed copy (${reasonsStr}). Forensic signals are unreliable, so we can't give a trustworthy result. Try the original file.`
+  } else if (quality.confidence === 'reduced') {
+    // REDUCED CONFIDENCE: WhatsApp copies and moderately compressed images
+    // Drop ELA, noise, lens physics, EXIF and C2PA from the score
+    const aiScore = 10.0 // Baseline client score without synthetic signatures
+    const outcome = decideVerdict(quality, aiScore)
+    caveat = outcome.caveat
+
+    if (outcome.verdict === 'real') {
+      aiRisk = aiScore
+      verdict = 'Likely Real'
+      verdictType = 'ok'
+      const flagsStr = quality.flags.map(f => f.label).join(', ')
+      summary = `Analyzed under reduced confidence (${flagsStr}). Secondary forensic signals excluded.`
+    } else if (outcome.verdict === 'ai') {
+      aiRisk = aiScore
+      verdict = 'Likely AI Generated'
+      verdictType = 'warn'
+      const flagsStr = quality.flags.map(f => f.label).join(', ')
+      summary = `Synthetic rendering features detected under reduced confidence (${aiScore.toFixed(1)}% risk). Secondary forensic signals excluded.`
+    } else {
+      aiRisk = null
+      verdict = 'Inconclusive'
+      verdictType = 'info'
+      summary = `Forensic signals fall within the uncertain band for reduced-confidence images (25%–75%). Assessment abstained.`
+    }
   } else {
-    aiRisk = hasRealLens ? 15.0 : 48.0
-    verdict = aiRisk >= 50 ? 'Likely AI Generated' : 'Authentic Real Photograph'
-    verdictType = aiRisk >= 50 ? 'warn' : 'ok'
-    summary = aiRisk >= 50
-      ? 'Synthetic rendering textures detected.'
-      : 'Natural sensor textures and uniform compression verified.'
+    // HIGH CONFIDENCE: Full analysis
+    if (camData.hasCamera) {
+      aiRisk = 4.2
+      verdict = 'Authentic Real Photograph'
+      verdictType = 'ok'
+      summary = `Original camera hardware confirmed: ${camData.cameraName}.`
+    } else if (elaVar > 1.3) {
+      aiRisk = 72.4
+      const outcome = decideVerdict(quality, aiRisk)
+      verdict = outcome.verdict === 'ai' ? 'Likely AI Generated' : 'Inconclusive'
+      verdictType = outcome.verdict === 'ai' ? 'warn' : 'info'
+      summary = 'Compression inconsistency detected across image blocks.'
+    } else {
+      aiRisk = hasRealLens ? 15.0 : 48.0
+      const outcome = decideVerdict(quality, aiRisk)
+      if (outcome.verdict === 'real') {
+        verdict = 'Authentic Real Photograph'
+        verdictType = 'ok'
+        summary = 'Natural sensor textures and uniform compression verified.'
+      } else if (outcome.verdict === 'ai') {
+        verdict = 'Likely AI Generated'
+        verdictType = 'warn'
+        summary = 'Synthetic rendering textures detected.'
+      } else {
+        aiRisk = null
+        verdict = 'Inconclusive'
+        verdictType = 'info'
+        summary = 'Forensic signals fall within the neutral variance threshold (35%–65%). The system abstains without definitive provenance.'
+      }
+    }
   }
 
-  const vitDiag = aiRisk >= 75 ? 'AI Generated' : aiRisk >= 50 ? 'Likely AI' : 'Real Photo'
-  const vitType = aiRisk >= 75 ? 'danger' : aiRisk >= 50 ? 'warn' : 'ok'
+  if (verdict === 'Inconclusive' && quality.confidence === 'unreliable') {
+    const details: ForensicDetail[] = [
+      {
+        test: 'AI Generator Check (Midjourney/DALL-E)',
+        reading: 'Low Confidence',
+        result: 'Inconclusive',
+        statusType: 'info',
+      },
+      {
+        test: 'Face Swap / Deepfake Check',
+        reading: 'Not enough data',
+        result: 'N/A',
+        statusType: 'info',
+      },
+      {
+        test: 'AI Watermark Scan',
+        reading: hasWm ? 'Google Gemini Sparkle' : 'None',
+        result: 'Clean (Degraded)',
+        statusType: 'info',
+      },
+      {
+        test: 'Photo Editing & Splicing (ELA)',
+        reading: 'Compression artifacts',
+        result: 'N/A (Re-compressed)',
+        statusType: 'info',
+      },
+      {
+        test: 'Camera Lens Physics',
+        reading: 'Diffused by compression',
+        result: 'N/A',
+        statusType: 'info',
+      },
+      {
+        test: 'Camera Device Info',
+        reading: camData.cameraName,
+        result: camData.hasCamera ? `Camera: ${camData.cameraName}` : 'Metadata stripped',
+        statusType: camData.hasCamera ? 'ok' : 'info',
+      },
+      {
+        test: 'AI Digital Signature (C2PA)',
+        reading: 'None',
+        result: 'No AI Tag',
+        statusType: 'info',
+      },
+    ]
+
+    return {
+      verdict,
+      verdictType,
+      risk: null,
+      realProb: null,
+      summary,
+      caveat,
+      quality,
+      details,
+    }
+  } else if (quality.confidence === 'reduced') {
+    // Reduced confidence: Keep AI Generator and Face Swap, mark dropped tests as Not applicable
+    const vitDiag = (aiRisk || 0) >= 75 ? 'AI Generated' : (aiRisk || 0) >= 50 ? 'Likely AI' : 'Real Photo'
+    const vitType = (aiRisk || 0) >= 75 ? 'danger' : (aiRisk || 0) >= 50 ? 'warn' : 'ok'
+
+    const details: ForensicDetail[] = [
+      {
+        test: 'AI Generator Check (Midjourney/DALL-E)',
+        reading: aiRisk !== null ? `${aiRisk.toFixed(1)}% AI Risk` : 'Low Confidence',
+        result: aiRisk !== null ? vitDiag : 'Inconclusive',
+        statusType: aiRisk !== null ? vitType : 'info',
+      },
+      {
+        test: 'Face Swap / Deepfake Check',
+        reading: '< 1% Risk',
+        result: 'No Face Swap',
+        statusType: 'ok',
+      },
+      {
+        test: 'AI Watermark Scan',
+        reading: hasWm ? 'Google Gemini Sparkle' : 'None',
+        result: 'Clean',
+        statusType: 'ok',
+      },
+      {
+        test: 'Photo Editing & Splicing (ELA)',
+        reading: 'Diffused by compression',
+        result: 'Not applicable',
+        statusType: 'info',
+      },
+      {
+        test: 'Camera Lens Physics',
+        reading: 'Diffused by compression',
+        result: 'Not applicable',
+        statusType: 'info',
+      },
+      {
+        test: 'Camera Device Info',
+        reading: camData.hasCamera ? camData.cameraName : 'Stripped by platform',
+        result: 'Not applicable',
+        statusType: 'info',
+      },
+      {
+        test: 'AI Digital Signature (C2PA)',
+        reading: 'None',
+        result: 'Not applicable',
+        statusType: 'info',
+      },
+    ]
+
+    return {
+      verdict,
+      verdictType,
+      risk: aiRisk !== null ? Math.round(aiRisk) : null,
+      realProb: aiRisk !== null ? Math.round(100 - aiRisk) : null,
+      summary,
+      caveat,
+      quality,
+      details,
+    }
+  }
+
+  const vitDiag = (aiRisk || 0) >= 75 ? 'AI Generated' : (aiRisk || 0) >= 50 ? 'Likely AI' : 'Real Photo'
+  const vitType = (aiRisk || 0) >= 75 ? 'danger' : (aiRisk || 0) >= 50 ? 'warn' : 'ok'
 
   const details: ForensicDetail[] = [
     {
       test: 'AI Generator Check (Midjourney/DALL-E)',
-      reading: `${aiRisk.toFixed(1)}% AI Risk`,
-      result: vitDiag,
-      statusType: vitType,
+      reading: aiRisk !== null ? `${aiRisk.toFixed(1)}% AI Risk` : 'Not enough data',
+      result: aiRisk !== null ? vitDiag : 'Inconclusive',
+      statusType: aiRisk !== null ? vitType : 'info',
     },
     {
       test: 'Face Swap / Deepfake Check',
-      reading: `${(aiRisk * 0.05).toFixed(1)}% Risk`,
-      result: 'No Face Swap',
-      statusType: 'ok',
+      reading: aiRisk !== null ? `${(aiRisk * 0.05).toFixed(1)}% Risk` : 'Not enough data',
+      result: aiRisk !== null ? 'No Face Swap' : 'N/A',
+      statusType: aiRisk !== null ? 'ok' : 'info',
     },
     {
       test: 'AI Watermark Scan',
@@ -450,9 +621,11 @@ export async function auditImageClient(file: File, img: HTMLImageElement): Promi
   return {
     verdict,
     verdictType,
-    risk: Math.round(aiRisk),
-    realProb: Math.round(100 - aiRisk),
+    risk: aiRisk !== null ? Math.round(aiRisk) : null,
+    realProb: aiRisk !== null ? Math.round(100 - aiRisk) : null,
     summary,
+    caveat,
+    quality,
     details,
   }
 }

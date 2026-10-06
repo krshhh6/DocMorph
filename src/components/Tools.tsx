@@ -4,6 +4,7 @@ import { AlertTriangle, CheckCircle2, Download, FileText, RotateCcw, RotateCw, S
 import { Card, Eyebrow, PrimaryButton, StatsStrip, StatusChip, TagChip } from './ui'
 import { PassportFace } from './Workspace'
 import { auditImageClient, detectGeminiSparkle } from '../forensicsClient'
+import type { QualityReport } from '../qualityGate'
 
 
 function ToolHeader({ n, name, title, desc, stats }: { n: string; name: string; title: string; desc: string; stats: [string, string][] }) {
@@ -825,10 +826,12 @@ export function Deepfake() {
   // Inspection Results State
   const [result, setResult] = useState<{
     verdict: string
-    verdictType: 'danger' | 'warn' | 'ok'
-    risk: number
-    realProb: number
+    verdictType: 'danger' | 'warn' | 'ok' | 'info'
+    risk: number | null
+    realProb: number | null
     summary: string
+    caveat?: string | null
+    quality?: QualityReport
     details: {
       test: string
       reading: string
@@ -836,6 +839,7 @@ export function Deepfake() {
       statusType: 'danger' | 'warn' | 'ok' | 'info'
     }[]
   } | null>(null)
+  const [showRawSignals, setShowRawSignals] = useState(false)
 
   const pick = (f?: File) => {
     if (!f) return
@@ -850,6 +854,7 @@ export function Deepfake() {
     })
     setScan('idle')
     setResult(null)
+    setShowRawSignals(false)
   }
 
   const clear = () => {
@@ -857,6 +862,7 @@ export function Deepfake() {
     setFile(null)
     setScan('idle')
     setResult(null)
+    setShowRawSignals(false)
   }
 
   const isVideo = mode === 'Video'
@@ -866,6 +872,17 @@ export function Deepfake() {
   const runAudit = async () => {
     if (!file) return
     setScan('scanning')
+    const startTime = Date.now()
+    // Random scanning duration between 3.0s and 5.0s (3000ms - 5000ms)
+    const targetScanDuration = Math.floor(Math.random() * 2000) + 3000
+
+    const waitRemainingTime = async () => {
+      const elapsed = Date.now() - startTime
+      const remaining = Math.max(0, targetScanDuration - elapsed)
+      if (remaining > 0) {
+        await new Promise(r => setTimeout(r, remaining))
+      }
+    }
 
     // 1. Try Backend Forensics API (localhost:8000 when local, or Railway when deployed)
     try {
@@ -912,12 +929,15 @@ export function Deepfake() {
               } catch (_) {}
             }
 
+            await waitRemainingTime()
             setResult({
               verdict: data.verdict,
-              verdictType: data.verdictType || (data.verdict.includes('Confirmed') || data.verdict.includes('Deepfake') ? 'danger' : data.verdict.includes('Likely') ? 'warn' : 'ok'),
+              verdictType: data.verdictType || (data.verdict.includes('Confirmed') || data.verdict.includes('Deepfake') ? 'danger' : data.verdict.includes('Likely') ? 'warn' : data.verdict === 'Inconclusive' ? 'info' : 'ok'),
               risk: data.risk,
               realProb: data.realProb,
               summary: data.summary,
+              caveat: data.caveat,
+              quality: data.quality,
               details: data.details,
             })
             setScan('done')
@@ -940,21 +960,27 @@ export function Deepfake() {
         img.onerror = r
       })
       const clientResult = await auditImageClient(file.raw, img)
+      await waitRemainingTime()
       setResult(clientResult)
       setScan('done')
     } catch (err) {
       console.error('Forensic scan error:', err)
+      await waitRemainingTime()
       setScan('done')
     }
   }
 
+  const isReduced = result?.quality?.confidence === 'reduced'
+  const isInconclusive = result?.verdict === 'Inconclusive'
   const currentScore = result ? result.risk : (isVideo ? 87 : 59)
   const currentVerdict = result
     ? (result.verdictType === 'danger'
         ? ['Confirmed AI Generated', 'text-danger', 'bg-danger/10']
         : result.verdictType === 'warn'
         ? ['Likely AI Generated', 'text-warn', 'bg-warn-pale']
-        : ['Authentic Real Photo', 'text-ok', 'bg-ok-pale'])
+        : result.verdictType === 'info' || isInconclusive
+        ? ['Inconclusive', 'text-muted', 'bg-msurf']
+        : [isReduced ? 'Likely Real' : 'Authentic Real Photo', 'text-ok', 'bg-ok-pale'])
     : (isVideo
         ? ['Likely Manipulated', 'text-danger', 'bg-danger/10']
         : ['Awaiting Scan', 'text-muted', 'bg-msurf'])
@@ -968,8 +994,8 @@ export function Deepfake() {
         desc="Scan a photo or clip for face swaps, generator fingerprints, and image tampering with detailed forensic proof."
         stats={[
           ['Verdict', result ? result.verdict : 'Ready'],
-          ['AI Risk', scan === 'done' ? `${currentScore}%` : '—'],
-          ['Frames Flagged', isVideo ? '14 / 96' : '—'],
+          ['AI Risk', scan === 'done' ? (result?.risk !== null && result?.risk !== undefined ? `${result.risk}%` : '—') : '—'],
+          ['Confidence', result?.quality ? (result.quality.confidence === 'high' ? 'High' : result.quality.confidence === 'reduced' ? 'Reduced' : 'Unreliable') : 'Standard'],
           ['Forensic Engine', 'Multi-Parametric v2']
         ]}
       />
@@ -1011,90 +1037,209 @@ export function Deepfake() {
               </div>
             </div>
           )}
-          <PrimaryButton sparkle onClick={runAudit} className={`self-start ${file ? '' : 'pointer-events-none opacity-40'}`}>
+          <PrimaryButton sparkle onClick={runAudit} className={`self-start ${file && scan !== 'scanning' ? '' : 'pointer-events-none opacity-50'}`}>
             {scan === 'scanning' ? 'Scanning Image…' : file ? 'Scan Image' : 'Upload a file to scan'}
           </PrimaryButton>
         </>}
         right={<>
-          <div className={`flex items-center gap-6 transition-opacity duration-300 ${scan === 'done' ? '' : 'opacity-40'}`}>
-            <svg width="150" height="150" viewBox="0 0 160 160" className="shrink-0 -rotate-90">
-              <circle cx="80" cy="80" r="70" fill="none" strokeWidth="10" className="stroke-line-warm" />
-              <circle cx="80" cy="80" r="70" fill="none" strokeWidth="10" stroke="#FFD061" strokeLinecap="round" strokeDasharray={C} strokeDashoffset={scan === 'done' ? C * (1 - currentScore / 100) : C} style={{ transition: 'stroke-dashoffset 1s cubic-bezier(0.16,1,0.3,1)' }} />
-              <text x="80" y="88" textAnchor="middle" transform="rotate(90 80 80)" className="fill-ink font-mono text-[30px] font-medium">{scan === 'done' ? `${currentScore}%` : '—'}</text>
-            </svg>
-            <div>
-              <Eyebrow className="text-muted">AI Generated Risk</Eyebrow>
-              <span className={`mt-3 inline-flex rounded-full px-3 py-1 font-mono text-[11px] uppercase tracking-[0.06em] ${currentVerdict[1]} ${currentVerdict[2]}`}>{currentVerdict[0]}</span>
-              {result ? (
-                <p className="mt-2 text-xs text-body leading-relaxed">{result.summary}</p>
-              ) : (
-                <p className="mt-2 text-xs text-muted">Upload an image or clip to begin inspection.</p>
-              )}
-            </div>
-          </div>
-
-          {/* Inspection Details Section (Matching Image 3) */}
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center justify-between">
-              <h3 className="font-mono text-xs font-semibold uppercase tracking-wider text-muted">Inspection Details</h3>
-              {result && (
-                <span className="font-mono text-[10px] text-muted">
-                  Real: {result.realProb}% · AI: {result.risk}%
+          {isInconclusive ? (
+            <div className="flex flex-col gap-4 rounded-[17.6px] border border-line-warm bg-msurf/60 p-6">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[12px] border border-line-warm bg-card text-muted">
+                    <AlertTriangle size={18} className="text-warn" />
+                  </span>
+                  <div>
+                    <Eyebrow className="text-muted">Forensic Quality Gate</Eyebrow>
+                    <h4 className="text-base font-bold text-ink">Inconclusive — Assessment Abstained</h4>
+                  </div>
+                </div>
+                <span className="rounded-full border border-line-warm bg-card px-3 py-1 font-mono text-[10px] uppercase tracking-wider text-muted">
+                  {result.quality?.confidence === 'unreliable' ? 'Unreliable Media' : 'Uncertain Band'}
                 </span>
-              )}
-            </div>
+              </div>
 
-            <div className="overflow-hidden rounded-[16px] border border-line bg-card shadow-sm">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b border-line bg-soft font-mono text-[11px] uppercase text-muted">
-                    <th className="px-4 py-2.5 font-medium">Test</th>
-                    <th className="px-4 py-2.5 font-medium">Reading</th>
-                    <th className="px-4 py-2.5 font-medium">Result</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-line">
-                  {(result ? result.details : [
-                    { test: 'AI Generator Check (Midjourney/DALL-E)', reading: '—', result: 'Pending', statusType: 'info' as const },
-                    { test: 'Face Swap / Deepfake Check', reading: '—', result: 'Pending', statusType: 'info' as const },
-                    { test: 'AI Watermark Scan', reading: '—', result: 'Pending', statusType: 'info' as const },
-                    { test: 'Photo Editing & Splicing (ELA)', reading: '—', result: 'Pending', statusType: 'info' as const },
-                    { test: 'Camera Lens Physics', reading: '—', result: 'Pending', statusType: 'info' as const },
-                    { test: 'Camera Device Info', reading: '—', result: 'Pending', statusType: 'info' as const },
-                    { test: 'AI Digital Signature (C2PA)', reading: '—', result: 'Pending', statusType: 'info' as const },
-                  ]).map((row, i) => (
-                    <tr key={i} className="transition-colors hover:bg-msurf/50">
-                      <td className="px-4 py-2.5 font-medium text-body">{row.test}</td>
-                      <td className="px-4 py-2.5 font-mono text-muted">{row.reading}</td>
-                      <td className="px-4 py-2.5">
-                        <span className={`inline-flex items-center gap-1.5 font-mono text-[11px] font-medium ${
-                          row.statusType === 'danger'
-                            ? 'text-danger'
-                            : row.statusType === 'warn'
-                            ? 'text-warn'
-                            : row.statusType === 'ok'
-                            ? 'text-ok'
-                            : 'text-muted'
-                        }`}>
-                          {row.statusType === 'danger' && '🚨 '}
-                          {row.statusType === 'warn' && '⚠️ '}
-                          {row.statusType === 'ok' && '✅ '}
-                          {row.statusType === 'info' && 'ℹ️ '}
-                          {row.result}
-                        </span>
-                      </td>
-                    </tr>
+              <p className="text-xs leading-relaxed text-body">
+                {result.summary}
+              </p>
+
+              {result.quality && result.quality.flags && result.quality.flags.length > 0 && (
+                <div>
+                  <span className="font-mono text-[10px] uppercase tracking-wider text-muted">Hard Degradation Flags:</span>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {result.quality.flags.map((f, i) => (
+                      <span
+                        key={i}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-line-warm bg-card px-2.5 py-1 font-mono text-[10px] text-body"
+                      >
+                        <span className="text-warn">⚠️</span>
+                        {f.label}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Informational Notes */}
+              {result.quality && result.quality.notes && result.quality.notes.length > 0 && (
+                <div className="flex flex-col gap-1">
+                  {result.quality.notes.map((note, i) => (
+                    <p key={i} className="font-mono text-[10px] text-muted italic">
+                      ℹ️ {note}
+                    </p>
                   ))}
-                </tbody>
-              </table>
+                </div>
+              )}
+
+              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line-warm/60 pt-3">
+                <p className="font-mono text-[10px] text-muted">
+                  Percentage gauge hidden to prevent false certainty on degraded media.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setShowRawSignals(prev => !prev)}
+                  className="font-mono text-[11px] font-medium text-ink underline underline-offset-4 hover:text-muted cursor-pointer"
+                >
+                  {showRawSignals ? 'Hide raw signals' : 'Show raw signals'}
+                </button>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className={`flex items-center gap-6 transition-opacity duration-300 ${scan === 'done' ? '' : 'opacity-40'}`}>
+              <svg width="150" height="150" viewBox="0 0 160 160" className="shrink-0 -rotate-90">
+                <circle cx="80" cy="80" r="70" fill="none" strokeWidth="10" className="stroke-line-warm" />
+                <circle
+                  cx="80"
+                  cy="80"
+                  r="70"
+                  fill="none"
+                  strokeWidth="10"
+                  stroke={currentVerdict[0].includes('Real') ? '#34D399' : '#FFD061'}
+                  strokeLinecap="round"
+                  strokeDasharray={C}
+                  strokeDashoffset={scan === 'done' && currentScore !== null ? C * (1 - currentScore / 100) : C}
+                  style={{ transition: 'stroke-dashoffset 1s cubic-bezier(0.16,1,0.3,1)' }}
+                />
+                <text x="80" y="88" textAnchor="middle" transform="rotate(90 80 80)" className="fill-ink font-mono text-[30px] font-medium">
+                  {scan === 'done' && currentScore !== null ? `${currentScore}%` : '—'}
+                </text>
+              </svg>
+              <div>
+                <Eyebrow className="text-muted">AI Generated Risk</Eyebrow>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <span className={`inline-flex rounded-full px-3 py-1 font-mono text-[11px] uppercase tracking-[0.06em] ${currentVerdict[1]} ${currentVerdict[2]}`}>
+                    {currentVerdict[0]}
+                  </span>
+                  {(isReduced || result?.caveat) && (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-warn/40 bg-warn-pale px-2.5 py-0.5 font-mono text-[10px] font-medium text-warn">
+                      ⚠️ Reduced confidence
+                    </span>
+                  )}
+                </div>
+
+                {/* Soft flags */}
+                {result?.quality?.flags && result.quality.flags.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {result.quality.flags.map((f, i) => (
+                      <span
+                        key={i}
+                        className="inline-flex items-center gap-1 rounded-full border border-line-warm bg-card px-2 py-0.5 font-mono text-[10px] text-body"
+                      >
+                        ⚠️ {f.label}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {/* Notes in small grey text, never counted against image */}
+                {result?.quality?.notes && result.quality.notes.length > 0 && (
+                  <div className="mt-2 flex flex-col gap-0.5">
+                    {result.quality.notes.map((note, i) => (
+                      <p key={i} className="font-mono text-[10px] text-muted italic">
+                        ℹ️ {note}
+                      </p>
+                    ))}
+                  </div>
+                )}
+
+                {result ? (
+                  <p className="mt-2 text-xs text-body leading-relaxed">{result.summary}</p>
+                ) : (
+                  <p className="mt-2 text-xs text-muted">Upload an image or clip to begin inspection.</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Inspection Details Section */}
+          {(!isInconclusive || showRawSignals) && (
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <h3 className="font-mono text-xs font-semibold uppercase tracking-wider text-muted">
+                  {isInconclusive ? 'Raw Forensic Signals (Low Confidence)' : 'Inspection Details'}
+                </h3>
+                {result && (
+                  <span className="font-mono text-[10px] text-muted">
+                    {result.realProb !== null && result.risk !== null
+                      ? `Real: ${result.realProb}% · AI: ${result.risk}%`
+                      : 'Signals Unreliable (Abstained)'}
+                  </span>
+                )}
+              </div>
+
+              <div className="overflow-hidden rounded-[16px] border border-line bg-card shadow-sm">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-line bg-soft font-mono text-[11px] uppercase text-muted">
+                      <th className="px-4 py-2.5 font-medium">Test</th>
+                      <th className="px-4 py-2.5 font-medium">Reading</th>
+                      <th className="px-4 py-2.5 font-medium">Result</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-line">
+                    {(result ? result.details : [
+                      { test: 'AI Generator Check (Midjourney/DALL-E)', reading: '—', result: 'Pending', statusType: 'info' as const },
+                      { test: 'Face Swap / Deepfake Check', reading: '—', result: 'Pending', statusType: 'info' as const },
+                      { test: 'AI Watermark Scan', reading: '—', result: 'Pending', statusType: 'info' as const },
+                      { test: 'Photo Editing & Splicing (ELA)', reading: '—', result: 'Pending', statusType: 'info' as const },
+                      { test: 'Camera Lens Physics', reading: '—', result: 'Pending', statusType: 'info' as const },
+                      { test: 'Camera Device Info', reading: '—', result: 'Pending', statusType: 'info' as const },
+                      { test: 'AI Digital Signature (C2PA)', reading: '—', result: 'Pending', statusType: 'info' as const },
+                    ]).map((row, i) => (
+                      <tr key={i} className={`transition-colors hover:bg-msurf/50 ${row.statusType === 'info' ? 'opacity-75' : ''}`}>
+                        <td className="px-4 py-2.5 font-medium text-body">{row.test}</td>
+                        <td className="px-4 py-2.5 font-mono text-muted">{row.reading}</td>
+                        <td className="px-4 py-2.5">
+                          <span className={`inline-flex items-center gap-1.5 font-mono text-[11px] font-medium ${
+                            row.statusType === 'danger'
+                              ? 'text-danger'
+                              : row.statusType === 'warn'
+                              ? 'text-warn'
+                              : row.statusType === 'ok'
+                              ? 'text-ok'
+                              : 'text-muted'
+                          }`}>
+                            {row.statusType === 'danger' && '🚨 '}
+                            {row.statusType === 'warn' && '⚠️ '}
+                            {row.statusType === 'ok' && '✅ '}
+                            {row.statusType === 'info' && 'ℹ️ '}
+                            {row.result}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
           <button
             onClick={() => {
               if (!result) return
-              const reportText = `DocMorph Forensic Audit Report\nFile: ${file?.name}\nVerdict: ${result.verdict}\nAI Risk: ${result.risk}%\nSummary: ${result.summary}\n\nDetails:\n` +
-                result.details.map(d => `- ${d.test}: ${d.reading} (${d.result})`).join('\n')
+              const reportText = `DocMorph Forensic Audit Report\nFile: ${file?.name}\nVerdict: ${result.verdict}\nAI Risk: ${result.risk !== null ? `${result.risk}%` : 'Inconclusive (Abstained)'}\nSummary: ${result.summary}\n\nQuality Gate: ${result.quality?.reliable ? 'Reliable' : `Degraded (${result.quality?.reasons.join(', ')})`}\n\nDetails:\n` +
+                result.details.map(d => `- ${d.test}: ${d.reading} (${d.result})`).join('\n') +
+                `\n\nNotice: Results are most reliable on original, uncompressed camera files.`
               const blob = new Blob([reportText], { type: 'text/plain' })
               const url = URL.createObjectURL(blob)
               const a = document.createElement('a')
@@ -1108,6 +1253,12 @@ export function Deepfake() {
             <Download size={14} />
             Export Evidence Report
           </button>
+
+          {/* Quality Disclaimer Footer */}
+          <div className="mt-auto flex items-center justify-between border-t border-line pt-3 font-mono text-[11px] text-muted">
+            <span>Results are most reliable on original, uncompressed camera files.</span>
+            <span className="hidden sm:inline">DocMorph Forensics v2.2</span>
+          </div>
         </>}
       />
     </>
