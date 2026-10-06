@@ -3,9 +3,9 @@ import { ArrowLeft, ArrowRight } from 'lucide-react'
 import { Card, Eyebrow } from './ui'
 
 const members = [
-  { name: 'Krishna Kant', initials: 'KK', role: 'Creator · DocMorph', description: 'The creator behind DocMorph: File Studio Pro — one shared workspace for everyday documents, images, and file transformations.', tags: ['DocMorph', 'File Studio Pro'] },
-  { name: 'Sampoorn Tripathi', initials: 'ST', role: 'Team · DocMorph', description: 'Part of the team behind DocMorph: File Studio Pro. Different perspectives, one shared attention to detail.', tags: ['DocMorph', 'Our team'] },
-  { name: 'Divyam Pathak', initials: 'DP', role: 'Team · DocMorph', description: 'Part of the team behind DocMorph: File Studio Pro. Building a shared studio for your everyday file work.', tags: ['DocMorph', 'Our team'] },
+  { name: 'Krishna Kant', initials: 'KK', role: 'Creator · Frontend Architecture, File Conversions & AI Forensics', description: 'The creator behind DocMorph: File Studio Pro — leading frontend architecture, universal file conversions, and AI deepfake forensics.', tags: ['Frontend Architecture', 'File Conversions', 'AI Forensics'] },
+  { name: 'Sampoorn Tripathi', initials: 'ST', role: 'ATS Resume Scoring Engine & AI Summarizer', description: 'Part of the team behind DocMorph: File Studio Pro, focusing on ATS resume scoring and AI summarization pipelines.', tags: ['ATS Resume Scoring', 'AI Summarizer', 'DocMorph'] },
+  { name: 'Divyam Pathak', initials: 'DP', role: 'Passport Photo Studio & Plagiarism Analyzer', description: 'Part of the team behind DocMorph: File Studio Pro, crafting the biometric passport photo studio and plagiarism analyzer.', tags: ['Passport Photo Studio', 'Plagiarism Analyzer', 'DocMorph'] },
 ]
 
 export default function Team() {
