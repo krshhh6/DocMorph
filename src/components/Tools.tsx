@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import type { ReactNode } from 'react'
 import { AlertTriangle, CheckCircle2, Download, FileText, RotateCcw, Sparkles, Upload, X } from 'lucide-react'
 import { Card, Eyebrow, PrimaryButton, StatsStrip, StatusChip, TagChip } from './ui'
@@ -38,20 +38,49 @@ function Panel({ label, children, action }: { label: string; children?: ReactNod
 const BACKEND_URL = import.meta.env.VITE_API_URL || 'https://docmorph-production.up.railway.app'
 
 function Dropzone({ text, onFiles }: { text: string; onFiles?: (files: FileList) => void }) {
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [isDragOver, setIsDragOver] = useState(false)
+
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    fileInputRef.current?.click()
+  }
+
   return (
-    <label
-      onDragOver={e => e.preventDefault()}
+    <div
+      onClick={handleClick}
+      onDragOver={e => {
+        e.preventDefault()
+        setIsDragOver(true)
+      }}
+      onDragLeave={() => setIsDragOver(false)}
       onDrop={e => {
         e.preventDefault()
-        if (e.dataTransfer.files && onFiles) onFiles(e.dataTransfer.files)
+        setIsDragOver(false)
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0 && onFiles) {
+          onFiles(e.dataTransfer.files)
+        }
       }}
-      className="flex cursor-pointer flex-col items-center justify-center gap-3 rounded-[17.6px] border border-dashed border-line-warm bg-msurf px-6 py-10 text-center transition-colors duration-200 hover:border-ink"
+      className={`flex cursor-pointer flex-col items-center justify-center gap-3 rounded-[17.6px] border border-dashed px-6 py-10 text-center transition-all duration-200 select-none ${
+        isDragOver ? 'border-amber bg-amber/10' : 'border-line-warm bg-msurf hover:border-ink hover:bg-card'
+      }`}
     >
       <span className="grid h-10 w-10 place-items-center rounded-[12px] bg-card"><Upload size={16} /></span>
       <span className="text-sm font-semibold">{text}</span>
-      <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted">Drag & drop or browse · max 50 MB</span>
-      <input type="file" className="hidden" multiple onChange={e => e.target.files && onFiles?.(e.target.files)} />
-    </label>
+      <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted">Click to browse or drag & drop · max 50 MB</span>
+      <input
+        ref={fileInputRef}
+        type="file"
+        className="hidden"
+        multiple
+        onChange={e => {
+          if (e.target.files && e.target.files.length > 0 && onFiles) {
+            onFiles(e.target.files)
+          }
+          e.target.value = ''
+        }}
+      />
+    </div>
   )
 }
 
@@ -82,12 +111,7 @@ interface ConvertJob {
 export function Converter() {
   const [fmt, setFmt] = useState('PDF')
   const [isConverting, setIsConverting] = useState(false)
-  const [jobs, setJobs] = useState<ConvertJob[]>([
-    { id: '1', name: 'annual-report-2026.docx', from: 'DOCX', to: 'PDF', size: '2.4 MB', status: 'Done' },
-    { id: '2', name: 'product-shot-03.png', from: 'PNG', to: 'PDF', size: '6.1 MB', status: 'Queued' },
-    { id: '3', name: 'lease-agreement.jpg', from: 'JPG', to: 'PDF', size: '1.8 MB', status: 'Queued' },
-    { id: '4', name: 'brand-guide.webp', from: 'WEBP', to: 'PDF', size: '940 KB', status: 'Queued' },
-  ])
+  const [jobs, setJobs] = useState<ConvertJob[]>([])
 
   const handleFiles = (fileList: FileList) => {
     const newJobs: ConvertJob[] = Array.from(fileList).map(f => {
@@ -103,7 +127,7 @@ export function Converter() {
         status: 'Queued',
       }
     })
-    setJobs(prev => [...newJobs, ...prev.filter(j => !j.file)])
+    setJobs(prev => [...newJobs, ...prev])
   }
 
   const runConversion = async () => {
@@ -197,33 +221,41 @@ export function Converter() {
                 <tr>{['File', 'From', 'To', 'Size', 'Status', 'Action'].map(h => <th key={h} className="px-4 py-3 text-left font-medium">{h}</th>)}</tr>
               </thead>
               <tbody className="divide-y divide-line">
-                {jobs.map(job => (
-                  <tr key={job.id}>
-                    <td className="px-4 py-3 font-medium">
-                      <span className="flex items-center gap-2">
-                        <FileText size={14} className="text-muted" />
-                        <span className="max-w-[140px] truncate md:max-w-[200px]" title={job.name}>{job.name}</span>
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 font-mono text-xs text-muted">{job.from}</td>
-                    <td className="px-4 py-3 font-mono text-xs">{job.to}</td>
-                    <td className="px-4 py-3 font-mono text-xs text-muted">{job.size}</td>
-                    <td className="px-4 py-3"><StatusChip status={job.status} /></td>
-                    <td className="px-4 py-3">
-                      {job.downloadUrl ? (
-                        <a
-                          href={job.downloadUrl}
-                          download={job.downloadName}
-                          className="inline-flex items-center gap-1 font-mono text-xs text-amber-ink hover:underline"
-                        >
-                          <Download size={12} /> Save
-                        </a>
-                      ) : (
-                        <span className="text-xs text-muted">—</span>
-                      )}
+                {jobs.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-10 text-center text-muted">
+                      No files in queue. Click or drag & drop files on the left to start converting.
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  jobs.map(job => (
+                    <tr key={job.id}>
+                      <td className="px-4 py-3 font-medium">
+                        <span className="flex items-center gap-2">
+                          <FileText size={14} className="text-muted" />
+                          <span className="max-w-[140px] truncate md:max-w-[200px]" title={job.name}>{job.name}</span>
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 font-mono text-xs text-muted">{job.from}</td>
+                      <td className="px-4 py-3 font-mono text-xs">{job.to}</td>
+                      <td className="px-4 py-3 font-mono text-xs text-muted">{job.size}</td>
+                      <td className="px-4 py-3"><StatusChip status={job.status} /></td>
+                      <td className="px-4 py-3">
+                        {job.downloadUrl ? (
+                          <a
+                            href={job.downloadUrl}
+                            download={job.downloadName}
+                            className="inline-flex items-center gap-1 font-mono text-xs text-amber-ink hover:underline"
+                          >
+                            <Download size={12} /> Save
+                          </a>
+                        ) : (
+                          <span className="text-xs text-muted">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
