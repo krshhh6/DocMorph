@@ -115,14 +115,15 @@ export async function parseExifCamera(file: File): Promise<{ hasCamera: boolean;
 }
 
 // 3. Google Gemini Sparkle Watermark Matcher
+const SPARKLE_DATA_URL = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAAAAAByaaZbAAAFLklEQVRIDUXB/a/WdR3H8efz872+59gRgXOs9ISpRYRLLTl4V1vehE5Hc5oyu3HZjZqu1Z+TU5duFssfKizXIMEYrlYaAlZGmC5DPJrJ3QFC4Zzr/eo69kOPh41mAhShqQzDxLoH8uCO91BJkJFqrZHY1BRSwSZSYfkt9+fhzUdomkQJlJ0mdkoqSmEDCVz4rbvqicf/kdaoYEugaE3iAJOopJQR6a78/o31zA92nlZStEZFoElsmNgZqChgJm994BL+/MhThxQqTZKmRGKD0DSBoBAvufe2c3j7yR/uJWmJRERDsCkJWkE0yeT6+2bGPbXzoW3Hg2GRoIHYWsew6BwWDZMMLvn2lz4MefPnG/cNoZQgSiAObFTZOSzQwNQX75vpi5za89jmI1YaRTNIAHsg0KwYDWes+eb6DxLMwc2PvbhQkdAgkoADIiMiWNV/fMOXVw6CMv/KTzYdWAgtaQaSgF1ACa0FK+fc/PWZCYLAyZ0bt71TNKu1YaxA7BI1UVvC0s/dfe2kkLKRI9s3PneiaMSMYGKXNBPELsOz1t5503RnQjVxOPv0pj3HSpNWQRK72CjQWGeu3XDDeX0z0WBqYXbbpt3H00yIJjgACe9bMrPhxhU9WshIYr2+9ckXTxQWmgT7BATSnT1z6xc+MkZpaWjBZP6NHb/adWihtWgVOAiyaPy8z9589bkdRKJBpMLw389t+cMb812AAscSCYNlq6+9/uLljf8TCDA8+tftv/v70WFoBCeGQ3TJ+Zddc+VHJ6x0FiNRRkKC7+3f9dvdB45XSzUnFhb6pdOfuuryTyzvbJXOFCMyEgLq6aOvvfDHv80eP4Uu6yenV35mzcrJXjAoCQohQIwtmT/02ku7X/3XwXe9bXLVqgtWnN0naW0hHZpCgQTDiMHMH53d/+q+gz69bHrZmV1iVeeQJiRRDOF98j/Dk3NvHnXL8umpCQOVzgKBRATCSOhMqkGdPPzWnLdMfXL1x6Ynx1J0CVEgGCEISUcI84ff/ufLLx926fjU9KrLLl051UMgKiQgQUNCI/MHX/vLn16dPXzaXgdnrbjoystXTjZZJFSgEQ0JOjzyys4X9s3Ozas90LqJFWuuueKCibKjgEQkkoC++/rOZ/ccODFsJI6nWse8k6s/v+7SswZdCgwGCYnUsb3bn903t0BrqXhGysYwfGDF1euvOqdjREaCEFh4+7lfP3/gFFETPIMUmrTBsrW3Xjfdt8iIASHzs9t/sWuuICjBXsBErSUzd9xw3kCCQkBOH9j65O7jTSCYij00qLSWsGTNHTee3wU0ED39xtafvfifaNKshNiDUDSjOXPmzpvPFQkIefPpn+46YQI0CoM9i0JnIN3Sq7923RSSRqi5Z3/0+2NIAgYk9oCgiVbrp9bdtXYC7VKc2LVx68GKkGhAsadsYBBMa+ff/pVVLZ3J8JUnNu1fCIsiI4oDQjOilUGGjK+5Z/0yOpLDmx/f817CoggGsU9sQTGQ4OT6ez49Pgindz+65TAhBAEh4lhiqyC2FGhb/Y3bpxu8tenxvcNWkUQQAjie0iSoCUqW3nT/FT3zLzyydS4EpEBDSByn0qgoYaQZL7p3w4fqnV8+urcCKRulgZA4lggEIYBay2/77sX10iNPHWqQFM1AIIB9EExAAoiDK763jt88+PxCo0LQQCCIY4kICQKR6IV3f5UnfrwfEhIQwiJxLCCERDAoWb7+Oz685RgVE0AIAcEeMJBgkLJnOH79A+2hHadSMREwhBH5L5ZRLEHWxwF1AAAAAElFTkSuQmCC"
 let _cachedTemplate: HTMLImageElement | null = null
 
 async function getTemplateImage(): Promise<HTMLImageElement | null> {
   if (_cachedTemplate && _cachedTemplate.complete) return _cachedTemplate
   return new Promise(resolve => {
     const img = new Image()
-    img.crossOrigin = 'anonymous'
-    img.src = '/gemini_sparkle_alpha.png'
+    
+    img.src = SPARKLE_DATA_URL
     img.onload = () => {
       _cachedTemplate = img
       resolve(img)
@@ -259,7 +260,7 @@ export async function detectGeminiSparkle(img: HTMLImageElement): Promise<{ hasW
       }
     }
 
-    const isWm = (bestSc >= 0.84 && bestLift >= 15.0 && bestSym >= 0.65) || (bestSc >= 0.92 && bestLift >= 10.0)
+    const isWm = (bestSc >= 0.80 && bestLift >= 12.0) || (bestSc >= 0.75 && bestLift >= 25.0) || (bestSc >= 0.88)
     return { hasWatermark: isWm, score: Math.max(0, bestSc) }
   } catch (e) {
     return { hasWatermark: false, score: 0 }

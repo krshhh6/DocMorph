@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import { AlertTriangle, CheckCircle2, Download, FileText, RotateCcw, RotateCw, Sparkles, Upload, X, ArrowLeft, ArrowRight, Trash2, Plus, ArrowUpDown, Check, FileCheck, GripVertical, ExternalLink, Cpu } from 'lucide-react'
 import { Card, Eyebrow, PrimaryButton, StatsStrip, StatusChip, TagChip } from './ui'
 import { PassportFace } from './Workspace'
-import { auditImageClient } from '../forensicsClient'
+import { auditImageClient, detectGeminiSparkle } from '../forensicsClient'
 
 
 function ToolHeader({ n, name, title, desc, stats }: { n: string; name: string; title: string; desc: string; stats: [string, string][] }) {
@@ -887,6 +887,31 @@ export function Deepfake() {
           })
           if (res.ok) {
             const data = await res.json()
+
+            // If backend missed the watermark or returned None, cross-check with client detector
+            const wmRow = data.details?.find((d: any) => d.test === 'AI Watermark Scan')
+            if (wmRow && (wmRow.reading === 'None' || wmRow.result === 'Clean')) {
+              try {
+                const img = new Image()
+                img.src = file.url
+                await new Promise(r => {
+                  img.onload = r
+                  img.onerror = r
+                })
+                const wmCheck = await detectGeminiSparkle(img)
+                if (wmCheck.hasWatermark) {
+                  wmRow.reading = 'Google Gemini Sparkle'
+                  wmRow.result = 'AI Watermark Found'
+                  wmRow.statusType = 'danger'
+                  data.verdict = 'Confirmed AI Generated'
+                  data.verdictType = 'danger'
+                  data.risk = 100
+                  data.realProb = 0
+                  data.summary = 'Official AI provenance detected (Google Gemini Sparkle Watermark).'
+                }
+              } catch (_) {}
+            }
+
             setResult({
               verdict: data.verdict,
               verdictType: data.verdictType || (data.verdict.includes('Confirmed') || data.verdict.includes('Deepfake') ? 'danger' : data.verdict.includes('Likely') ? 'warn' : 'ok'),
