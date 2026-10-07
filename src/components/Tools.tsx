@@ -670,55 +670,293 @@ export function Compressor() {
 
 /* 03 ATS */
 export function ATS() {
-  const score = 84
+  const [resume, setResume] = useState<File | null>(null)
+  const [jobDescription, setJobDescription] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [result, setResult] = useState<any>(null)
+  const [error, setError] = useState('')
+
   const C = 2 * Math.PI * 70
-  const kws: [string, 'High' | 'Med' | 'Low'][] = [['Kubernetes', 'High'], ['Stakeholder management', 'High'], ['GraphQL', 'Med'], ['CI/CD', 'Med'], ['A/B testing', 'Low']]
-  const sev = { High: 'bg-danger/10 text-danger', Med: 'bg-warn-pale text-warn', Low: 'bg-msurf text-muted' }
+
+  const analyzeResume = async () => {
+    if (!resume) {
+      setError('Please upload your resume first.')
+      return
+    }
+
+    if (!jobDescription.trim()) {
+      setError('Please enter a job description.')
+      return
+    }
+
+    setLoading(true)
+    setError('')
+    setResult(null)
+
+    try {
+      const formData = new FormData()
+      formData.append('file', resume)
+      formData.append('job_description', jobDescription)
+
+      const response = await fetch(
+        'http://localhost:8000/api/ats/analyze',
+        {
+          method: 'POST',
+          body: formData,
+        }
+      )
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.detail || 'ATS analysis failed.')
+      }
+
+      setResult(data)
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Something went wrong while analyzing the resume.'
+      )
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const score = result?.match_score ?? 0
+
+  const missingKeywords: [string, 'High' | 'Med' | 'Low'][] =
+    (result?.missing_keywords ?? []).map(
+      (keyword: string, index: number) => [
+        keyword,
+        index < 3 ? 'High' : index < 6 ? 'Med' : 'Low',
+      ]
+    )
+
+  const sev = {
+    High: 'bg-danger/10 text-danger',
+    Med: 'bg-warn-pale text-warn',
+    Low: 'bg-msurf text-muted',
+  }
+
+  const getMatchLabel = () => {
+    if (!result) return 'Waiting for scan'
+    if (score >= 75) return 'Strong match'
+    if (score >= 50) return 'Moderate match'
+    return 'Needs improvement'
+  }
+
   return (
     <>
-      <ToolHeader n="03" name="ATS Resume Optimizer" title="ATS Resume Optimizer" desc="Score a resume against a job description and fix what an applicant tracking system would reject." stats={[['Match Score', '84%'], ['Since Last Scan', '+12%'], ['Missing Keywords', '5'], ['Word Count', '482']]} />
+      <ToolHeader
+        n="03"
+        name="ATS Resume Optimizer"
+        title="ATS Resume Optimizer"
+        desc="Score a resume against a job description and fix what an applicant tracking system would reject."
+        stats={[
+          ['Match Score', result ? `${score}%` : '—'],
+          ['Status', result ? result.prediction : 'Not scanned'],
+          [
+            'Missing Keywords',
+            result ? String(result.missing_keywords?.length ?? 0) : '—',
+          ],
+          ['Word Count', result ? String(result.word_count) : '—'],
+        ]}
+      />
+
       <Workbench
-        left={<>
-          <Panel label="Resume" />
-          <Dropzone text="Drop resume (PDF or DOCX)" />
-          <Panel label="Job Description" />
-          <textarea defaultValue="Senior Product Engineer — own platform features end to end, ship with Kubernetes and GraphQL, partner with stakeholders across design and data…" className="min-h-36 rounded-[16px] border border-line-warm bg-msurf p-4 text-sm leading-relaxed text-body outline-none focus:border-ink" />
-          <PrimaryButton sparkle className="self-start">Rescan Resume</PrimaryButton>
-        </>}
-        right={<>
-          <div className="flex items-center gap-6">
-            <svg width="160" height="160" viewBox="0 0 160 160" className="shrink-0 -rotate-90">
-              <circle cx="80" cy="80" r="70" fill="none" strokeWidth="10" className="stroke-line-warm" />
-              <circle cx="80" cy="80" r="70" fill="none" strokeWidth="10" stroke="#FFD061" strokeLinecap="round" strokeDasharray={C} strokeDashoffset={C * (1 - score / 100)} />
-              <text x="80" y="88" textAnchor="middle" transform="rotate(90 80 80)" className="fill-ink font-mono text-[30px] font-medium">{score}%</text>
-            </svg>
-            <div>
-              <Eyebrow className="text-muted">Match Gauge</Eyebrow>
-              <p className="mt-2 text-xl font-bold">Strong match</p>
-              <p className="mt-1 font-mono text-xs text-ok">+12% after suggested fixes</p>
+        left={
+          <>
+            <Panel label="Resume" />
+
+            <label className="flex min-h-32 cursor-pointer flex-col items-center justify-center rounded-[16px] border border-dashed border-line-warm bg-msurf p-5 text-center transition hover:border-ink">
+              <Upload size={22} className="mb-2 text-muted" />
+
+              <span className="text-sm font-medium">
+                {resume ? resume.name : 'Drop resume (PDF or DOCX)'}
+              </span>
+
+              <span className="mt-1 text-xs text-muted">
+                PDF, DOCX or TXT
+              </span>
+
+              <input
+                type="file"
+                accept=".pdf,.docx,.txt"
+                className="hidden"
+                onChange={(e) => {
+                  setResume(e.target.files?.[0] ?? null)
+                  setResult(null)
+                  setError('')
+                }}
+              />
+            </label>
+
+            <Panel label="Job Description" />
+
+            <textarea
+              value={jobDescription}
+              onChange={(e) => setJobDescription(e.target.value)}
+              placeholder="Paste the job description here..."
+              className="min-h-36 rounded-[16px] border border-line-warm bg-msurf p-4 text-sm leading-relaxed text-body outline-none focus:border-ink"
+            />
+
+            {error && (
+              <p className="rounded-[12px] bg-danger/10 px-4 py-3 text-sm text-danger">
+                {error}
+              </p>
+            )}
+
+            <PrimaryButton
+              sparkle
+              className="self-start"
+              onClick={analyzeResume}
+              disabled={loading}
+            >
+              {loading ? 'Analyzing Resume...' : 'Analyze Resume'}
+            </PrimaryButton>
+          </>
+        }
+
+        right={
+          <>
+            <div className="flex items-center gap-6">
+              <svg
+                width="160"
+                height="160"
+                viewBox="0 0 160 160"
+                className="shrink-0 -rotate-90"
+              >
+                <circle
+                  cx="80"
+                  cy="80"
+                  r="70"
+                  fill="none"
+                  strokeWidth="10"
+                  className="stroke-line-warm"
+                />
+
+                <circle
+                  cx="80"
+                  cy="80"
+                  r="70"
+                  fill="none"
+                  strokeWidth="10"
+                  stroke="#FFD061"
+                  strokeLinecap="round"
+                  strokeDasharray={C}
+                  strokeDashoffset={C * (1 - score / 100)}
+                />
+
+                <text
+                  x="80"
+                  y="88"
+                  textAnchor="middle"
+                  transform="rotate(90 80 80)"
+                  className="fill-ink font-mono text-[30px] font-medium"
+                >
+                  {result ? `${score}%` : '—'}
+                </text>
+              </svg>
+
+              <div>
+                <Eyebrow className="text-muted">
+                  Match Gauge
+                </Eyebrow>
+
+                <p className="mt-2 text-xl font-bold">
+                  {getMatchLabel()}
+                </p>
+
+                {result && (
+                  <p className="mt-1 font-mono text-xs text-muted">
+                    Prediction: {result.prediction}
+                  </p>
+                )}
+              </div>
             </div>
-          </div>
-          <div>
-            <Eyebrow className="mb-3 text-muted">Missing Keywords</Eyebrow>
-            <div className="flex flex-wrap gap-2">{kws.map(([k, s]) => <span key={k} className="inline-flex items-center gap-2 rounded-full border border-line-warm py-1 pl-3 pr-1 text-xs">{k}<span className={`rounded-full px-2 py-0.5 font-mono text-[9px] uppercase ${sev[s]}`}>{s}</span></span>)}</div>
-          </div>
-          <div className="grid grid-cols-2 gap-px overflow-hidden rounded-[16px] border border-line bg-line">
-            <div className="bg-card p-4"><Eyebrow className="text-muted">Readability</Eyebrow><p className="mt-2 font-mono text-2xl">8th grade</p></div>
-            <div className="bg-card p-4"><Eyebrow className="text-muted">Words</Eyebrow><p className="mt-2 font-mono text-2xl">482</p></div>
-          </div>
-          <ul className="flex flex-col divide-y divide-line rounded-[16px] border border-line">
-            {[['Single-column layout', true], ['Standard section headings', true], ['No images or text boxes', true], ['Dates in a consistent format', false]].map(([t, ok]) => (
-              <li key={t as string} className="flex items-center gap-3 px-4 py-3 text-sm">
-                {ok ? <CheckCircle2 size={16} className="text-ok" /> : <AlertTriangle size={16} className="text-warn" />}{t}
-              </li>
-            ))}
-          </ul>
-        </>}
+
+            <div>
+              <Eyebrow className="mb-3 text-muted">
+                Missing Keywords
+              </Eyebrow>
+
+              {missingKeywords.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {missingKeywords.map(([keyword, severity]) => (
+                    <span
+                      key={keyword}
+                      className="inline-flex items-center gap-2 rounded-full border border-line-warm py-1 pl-3 pr-1 text-xs"
+                    >
+                      {keyword}
+
+                      <span
+                        className={`rounded-full px-2 py-0.5 font-mono text-[9px] uppercase ${sev[severity]}`}
+                      >
+                        {severity}
+                      </span>
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted">
+                  {result
+                    ? 'No major missing keywords detected.'
+                    : 'Run an analysis to see missing keywords.'}
+                </p>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-px overflow-hidden rounded-[16px] border border-line bg-line">
+              <div className="bg-card p-4">
+                <Eyebrow className="text-muted">
+                  Prediction
+                </Eyebrow>
+
+                <p className="mt-2 font-mono text-lg">
+                  {result?.prediction ?? '—'}
+                </p>
+              </div>
+
+              <div className="bg-card p-4">
+                <Eyebrow className="text-muted">
+                  Words
+                </Eyebrow>
+
+                <p className="mt-2 font-mono text-2xl">
+                  {result?.word_count ?? '—'}
+                </p>
+              </div>
+            </div>
+
+            <ul className="flex flex-col divide-y divide-line rounded-[16px] border border-line">
+              {[
+                ['Resume uploaded', !!resume],
+                ['Job description added', !!jobDescription.trim()],
+                ['ATS analysis completed', !!result],
+                ['Missing keywords checked', !!result],
+              ].map(([text, ok]) => (
+                <li
+                  key={text as string}
+                  className="flex items-center gap-3 px-4 py-3 text-sm"
+                >
+                  {ok ? (
+                    <CheckCircle2 size={16} className="text-ok" />
+                  ) : (
+                    <AlertTriangle size={16} className="text-warn" />
+                  )}
+
+                  {text}
+                </li>
+              ))}
+            </ul>
+          </>
+        }
       />
     </>
   )
 }
-
 /* 04 Passport */
 export function Passport() {
   const [country, setCountry] = useState('US 2×2 in')
