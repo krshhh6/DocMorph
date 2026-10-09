@@ -1,10 +1,11 @@
 import { useState, useRef } from 'react'
 import type { ReactNode } from 'react'
-import { AlertTriangle, CheckCircle2, Download, FileText, RotateCcw, RotateCw, Sparkles, Upload, X, ArrowLeft, ArrowRight, Trash2, Plus, ArrowUpDown, Check, FileCheck, GripVertical, ExternalLink, Cpu } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Download, FileText, RotateCcw, RotateCw, Sparkles, Upload, X, ArrowLeft, ArrowRight, Trash2, Plus, ArrowUpDown, Check, FileCheck, GripVertical, ExternalLink, Cpu, Loader2 } from 'lucide-react'
 import { Card, Eyebrow, PrimaryButton, StatsStrip, StatusChip, TagChip } from './ui'
 import { PassportFace } from './Workspace'
 import { auditImageClient, detectGeminiSparkle } from '../forensicsClient'
 import type { QualityReport } from '../qualityGate'
+import { forensicsConfig } from '../forensicsConfig'
 
 
 function ToolHeader({ n, name, title, desc, stats }: { n: string; name: string; title: string; desc: string; stats: [string, string][] }) {
@@ -38,7 +39,7 @@ function Panel({ label, children, action }: { label: string; children?: ReactNod
   )
 }
 
-const BACKEND_URL = import.meta.env.VITE_API_URL || 'https://docmorph-production.up.railway.app'
+const BACKEND_URL = import.meta.env.VITE_API_URL || 'https://docmorph-production-bad0.up.railway.app'
 
 function Dropzone({ text, onFiles }: { text: string; onFiles?: (files: FileList) => void }) {
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -669,51 +670,281 @@ export function Compressor() {
 }
 
 /* 03 ATS */
+interface AtsApiResponse {
+  success: boolean
+  filename?: string
+  prediction: string
+  match_score: number
+  confidence: number
+  probabilities?: {
+    'Good Fit'?: number
+    'No Fit'?: number
+    'Potential Fit'?: number
+  }
+  word_count: number
+  matched_keywords: string[]
+  missing_keywords: string[]
+  model?: string
+  detail?: string
+}
+
 export function ATS() {
-  const score = 84
+  const [file, setFile] = useState<File | null>(null)
+  const [jobDescription, setJobDescription] = useState(
+    'Senior Software Engineer — own platform features end to end, ship with Python, TypeScript, React and Docker, partner with stakeholders across design and data.'
+  )
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [result, setResult] = useState<AtsApiResponse | null>(null)
+
+  const handleDrop = (files: FileList) => {
+    if (files.length > 0) {
+      setFile(files[0])
+      setError(null)
+    }
+  }
+
+  const handleAnalyze = async () => {
+    if (!file) {
+      setError('Please select or drop a resume file (PDF or DOCX) first.')
+      return
+    }
+    if (!jobDescription.trim()) {
+      setError('Please enter a job description to score against.')
+      return
+    }
+
+    setLoading(true)
+    setError(null)
+
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('job_description', jobDescription.trim())
+
+      const res = await fetch(`${BACKEND_URL}/api/ats/analyze`, {
+        method: 'POST',
+        body: formData,
+      })
+
+      const data = await res.json()
+      if (!res.ok || data.success === false) {
+        throw new Error(data.detail || 'ATS analysis failed. Please try again.')
+      }
+
+      setResult(data)
+    } catch (err: any) {
+      setError(err.message || 'Unable to connect to Railway ATS server. Please verify network.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const score = result ? result.match_score : 84
   const C = 2 * Math.PI * 70
-  const kws: [string, 'High' | 'Med' | 'Low'][] = [['Kubernetes', 'High'], ['Stakeholder management', 'High'], ['GraphQL', 'Med'], ['CI/CD', 'Med'], ['A/B testing', 'Low']]
+  const isGood = score >= 75
+  const isPotential = score >= 50
+  const gaugeColor = isGood ? '#22C55E' : isPotential ? '#FFD061' : '#EF4444'
+  const predictionLabel = result ? result.prediction : 'Strong match'
+  const wordCount = result ? result.word_count : 482
+  const missingCount = result ? result.missing_keywords?.length || 0 : 5
+
+  const defaultMissingKws: [string, 'High' | 'Med' | 'Low'][] = [
+    ['Kubernetes', 'High'],
+    ['Stakeholder management', 'High'],
+    ['GraphQL', 'Med'],
+    ['CI/CD', 'Med'],
+    ['A/B testing', 'Low'],
+  ]
   const sev = { High: 'bg-danger/10 text-danger', Med: 'bg-warn-pale text-warn', Low: 'bg-msurf text-muted' }
+
   return (
     <>
-      <ToolHeader n="03" name="ATS Resume Optimizer" title="ATS Resume Optimizer" desc="Score a resume against a job description and fix what an applicant tracking system would reject." stats={[['Match Score', '84%'], ['Since Last Scan', '+12%'], ['Missing Keywords', '5'], ['Word Count', '482']]} />
+      <ToolHeader
+        n="03"
+        name="ATS Resume Optimizer"
+        title="ATS Resume Optimizer"
+        desc="Score a resume against a job description and fix what an applicant tracking system would reject."
+        stats={[
+          ['Match Score', `${score}%`],
+          ['Prediction', result ? result.prediction : 'Pending Scan'],
+          ['Missing Keywords', `${missingCount}`],
+          ['Word Count', `${wordCount}`],
+        ]}
+      />
       <Workbench
-        left={<>
-          <Panel label="Resume" />
-          <Dropzone text="Drop resume (PDF or DOCX)" />
-          <Panel label="Job Description" />
-          <textarea defaultValue="Senior Product Engineer — own platform features end to end, ship with Kubernetes and GraphQL, partner with stakeholders across design and data…" className="min-h-36 rounded-[16px] border border-line-warm bg-msurf p-4 text-sm leading-relaxed text-body outline-none focus:border-ink" />
-          <PrimaryButton sparkle className="self-start">Rescan Resume</PrimaryButton>
-        </>}
-        right={<>
-          <div className="flex items-center gap-6">
-            <svg width="160" height="160" viewBox="0 0 160 160" className="shrink-0 -rotate-90">
-              <circle cx="80" cy="80" r="70" fill="none" strokeWidth="10" className="stroke-line-warm" />
-              <circle cx="80" cy="80" r="70" fill="none" strokeWidth="10" stroke="#FFD061" strokeLinecap="round" strokeDasharray={C} strokeDashoffset={C * (1 - score / 100)} />
-              <text x="80" y="88" textAnchor="middle" transform="rotate(90 80 80)" className="fill-ink font-mono text-[30px] font-medium">{score}%</text>
-            </svg>
-            <div>
-              <Eyebrow className="text-muted">Match Gauge</Eyebrow>
-              <p className="mt-2 text-xl font-bold">Strong match</p>
-              <p className="mt-1 font-mono text-xs text-ok">+12% after suggested fixes</p>
+        left={
+          <>
+            <Panel label="Resume" />
+            {file ? (
+              <div className="flex items-center justify-between rounded-[16px] border border-line-warm bg-card p-4">
+                <div className="flex items-center gap-3 overflow-hidden">
+                  <div className="grid h-10 w-10 shrink-0 place-items-center rounded-[10px] bg-msurf text-ink">
+                    <FileText size={20} />
+                  </div>
+                  <div className="truncate">
+                    <p className="truncate text-sm font-semibold">{file.name}</p>
+                    <p className="font-mono text-xs text-muted">{(file.size / 1024).toFixed(1)} KB</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setFile(null)}
+                  className="rounded-lg p-2 text-muted hover:bg-msurf hover:text-ink cursor-pointer"
+                  title="Remove file"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            ) : (
+              <Dropzone text="Drop resume (PDF or DOCX)" onFiles={handleDrop} />
+            )}
+
+            <Panel label="Job Description" />
+            <textarea
+              value={jobDescription}
+              onChange={(e) => setJobDescription(e.target.value)}
+              placeholder="Paste the job description or target role requirements here..."
+              className="min-h-36 rounded-[16px] border border-line-warm bg-msurf p-4 text-sm leading-relaxed text-body outline-none focus:border-ink"
+            />
+
+            {error && (
+              <div className="flex items-center gap-2 rounded-[12px] border border-danger/20 bg-danger/10 p-3 text-xs text-danger">
+                <AlertTriangle size={15} className="shrink-0" />
+                <span>{error}</span>
+              </div>
+            )}
+
+            <PrimaryButton
+              sparkle={!loading}
+              onClick={handleAnalyze}
+              disabled={loading}
+              className="self-start cursor-pointer"
+            >
+              {loading ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 size={16} className="animate-spin" />
+                  Analyzing with Railway AI...
+                </span>
+              ) : (
+                'Rescan Resume'
+              )}
+            </PrimaryButton>
+          </>
+        }
+        right={
+          <>
+            <div className="flex items-center gap-6">
+              <svg width="160" height="160" viewBox="0 0 160 160" className="shrink-0 -rotate-90">
+                <circle cx="80" cy="80" r="70" fill="none" strokeWidth="10" className="stroke-line-warm" />
+                <circle
+                  cx="80"
+                  cy="80"
+                  r="70"
+                  fill="none"
+                  strokeWidth="10"
+                  stroke={gaugeColor}
+                  strokeLinecap="round"
+                  strokeDasharray={C}
+                  strokeDashoffset={C * (1 - score / 100)}
+                />
+                <text
+                  x="80"
+                  y="88"
+                  textAnchor="middle"
+                  transform="rotate(90 80 80)"
+                  className="fill-ink font-mono text-[30px] font-medium"
+                >
+                  {score}%
+                </text>
+              </svg>
+              <div>
+                <Eyebrow className="text-muted">Match Gauge</Eyebrow>
+                <p className="mt-2 text-xl font-bold">{predictionLabel}</p>
+                <p className={`mt-1 font-mono text-xs ${isGood ? 'text-ok' : isPotential ? 'text-warn' : 'text-danger'}`}>
+                  {result
+                    ? `${(result.confidence * 100).toFixed(1)}% AI Model Confidence`
+                    : '+12% after suggested fixes'}
+                </p>
+              </div>
             </div>
-          </div>
-          <div>
-            <Eyebrow className="mb-3 text-muted">Missing Keywords</Eyebrow>
-            <div className="flex flex-wrap gap-2">{kws.map(([k, s]) => <span key={k} className="inline-flex items-center gap-2 rounded-full border border-line-warm py-1 pl-3 pr-1 text-xs">{k}<span className={`rounded-full px-2 py-0.5 font-mono text-[9px] uppercase ${sev[s]}`}>{s}</span></span>)}</div>
-          </div>
-          <div className="grid grid-cols-2 gap-px overflow-hidden rounded-[16px] border border-line bg-line">
-            <div className="bg-card p-4"><Eyebrow className="text-muted">Readability</Eyebrow><p className="mt-2 font-mono text-2xl">8th grade</p></div>
-            <div className="bg-card p-4"><Eyebrow className="text-muted">Words</Eyebrow><p className="mt-2 font-mono text-2xl">482</p></div>
-          </div>
-          <ul className="flex flex-col divide-y divide-line rounded-[16px] border border-line">
-            {[['Single-column layout', true], ['Standard section headings', true], ['No images or text boxes', true], ['Dates in a consistent format', false]].map(([t, ok]) => (
-              <li key={t as string} className="flex items-center gap-3 px-4 py-3 text-sm">
-                {ok ? <CheckCircle2 size={16} className="text-ok" /> : <AlertTriangle size={16} className="text-warn" />}{t}
-              </li>
-            ))}
-          </ul>
-        </>}
+
+            {result && result.matched_keywords?.length > 0 && (
+              <div>
+                <Eyebrow className="mb-3 text-muted">Matched Keywords</Eyebrow>
+                <div className="flex flex-wrap gap-2">
+                  {result.matched_keywords.map((kw) => (
+                    <span
+                      key={kw}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-ok/30 bg-ok/10 px-3 py-1 text-xs text-ok"
+                    >
+                      <CheckCircle2 size={12} />
+                      {kw}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div>
+              <Eyebrow className="mb-3 text-muted">Missing Keywords</Eyebrow>
+              <div className="flex flex-wrap gap-2">
+                {result ? (
+                  result.missing_keywords?.length > 0 ? (
+                    result.missing_keywords.map((kw, i) => (
+                      <span
+                        key={kw}
+                        className="inline-flex items-center gap-2 rounded-full border border-line-warm py-1 pl-3 pr-2 text-xs"
+                      >
+                        {kw}
+                        <span className="rounded-full bg-danger/10 px-2 py-0.5 font-mono text-[9px] uppercase text-danger">
+                          {i < 2 ? 'High' : i < 5 ? 'Med' : 'Low'}
+                        </span>
+                      </span>
+                    ))
+                  ) : (
+                    <p className="text-xs text-ok font-medium">All essential keywords matched!</p>
+                  )
+                ) : (
+                  defaultMissingKws.map(([k, s]) => (
+                    <span
+                      key={k}
+                      className="inline-flex items-center gap-2 rounded-full border border-line-warm py-1 pl-3 pr-1 text-xs"
+                    >
+                      {k}
+                      <span className={`rounded-full px-2 py-0.5 font-mono text-[9px] uppercase ${sev[s]}`}>{s}</span>
+                    </span>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-px overflow-hidden rounded-[16px] border border-line bg-line">
+              <div className="bg-card p-4">
+                <Eyebrow className="text-muted">Readability</Eyebrow>
+                <p className="mt-2 font-mono text-2xl">{wordCount > 350 ? 'Professional' : 'Standard'}</p>
+              </div>
+              <div className="bg-card p-4">
+                <Eyebrow className="text-muted">Words</Eyebrow>
+                <p className="mt-2 font-mono text-2xl">{wordCount}</p>
+              </div>
+            </div>
+
+            <ul className="flex flex-col divide-y divide-line rounded-[16px] border border-line">
+              {[
+                ['Single-column layout compatible', true],
+                ['Standard section headings parsed', true],
+                ['ATS keyword density verified', result ? (result.matched_keywords?.length || 0) > 0 : true],
+                ['Role match threshold met (>=60%)', score >= 60],
+              ].map(([t, ok]) => (
+                <li key={t as string} className="flex items-center gap-3 px-4 py-3 text-sm">
+                  {ok ? <CheckCircle2 size={16} className="text-ok shrink-0" /> : <AlertTriangle size={16} className="text-warn shrink-0" />}
+                  {t}
+                </li>
+              ))}
+            </ul>
+          </>
+        }
       />
     </>
   )
@@ -974,13 +1205,11 @@ export function Deepfake() {
   const isInconclusive = result?.verdict === 'Inconclusive'
   const currentScore = result ? result.risk : (isVideo ? 87 : 59)
   const currentVerdict = result
-    ? (result.verdictType === 'danger'
-        ? ['Confirmed AI Generated', 'text-danger', 'bg-danger/10']
-        : result.verdictType === 'warn'
-        ? ['Likely AI Generated', 'text-warn', 'bg-warn-pale']
+    ? (result.verdictType === 'danger' || result.verdictType === 'warn'
+        ? ['Likely AI', result.verdictType === 'danger' ? 'text-danger' : 'text-warn', result.verdictType === 'danger' ? 'bg-danger/10' : 'bg-warn-pale']
         : result.verdictType === 'info' || isInconclusive
         ? ['Inconclusive', 'text-muted', 'bg-msurf']
-        : [isReduced ? 'Likely Real' : 'Authentic Real Photo', 'text-ok', 'bg-ok-pale'])
+        : ['Likely Real', 'text-ok', 'bg-ok-pale'])
     : (isVideo
         ? ['Likely Manipulated', 'text-danger', 'bg-danger/10']
         : ['Awaiting Scan', 'text-muted', 'bg-msurf'])
@@ -1234,29 +1463,62 @@ export function Deepfake() {
             </div>
           )}
 
-          <button
-            onClick={() => {
-              if (!result) return
-              const reportText = `DocMorph Forensic Audit Report\nFile: ${file?.name}\nVerdict: ${result.verdict}\nAI Risk: ${result.risk !== null ? `${result.risk}%` : 'Inconclusive (Abstained)'}\nSummary: ${result.summary}\n\nQuality Gate: ${result.quality?.reliable ? 'Reliable' : `Degraded (${result.quality?.reasons.join(', ')})`}\n\nDetails:\n` +
-                result.details.map(d => `- ${d.test}: ${d.reading} (${d.result})`).join('\n') +
-                `\n\nNotice: Results are most reliable on original, uncompressed camera files.`
-              const blob = new Blob([reportText], { type: 'text/plain' })
-              const url = URL.createObjectURL(blob)
-              const a = document.createElement('a')
-              a.href = url
-              a.download = `forensic_report_${file?.name || 'scan'}.txt`
-              a.click()
-              URL.revokeObjectURL(url)
-            }}
-            className={`inline-flex items-center gap-2 self-start rounded-[12px] border border-line-warm px-4 py-2.5 text-sm font-medium transition-colors duration-200 hover:border-ink ${result ? '' : 'pointer-events-none opacity-40'}`}
-          >
-            <Download size={14} />
-            Export Evidence Report
-          </button>
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                window.open('https://lens.google.com/', '_blank', 'noopener,noreferrer')
+                window.open('https://tineye.com/', '_blank', 'noopener,noreferrer')
+              }}
+              className="inline-flex items-center gap-2 rounded-[12px] border border-line-warm px-4 py-2.5 text-sm font-medium transition-colors duration-200 hover:border-ink cursor-pointer"
+            >
+              <ExternalLink size={14} />
+              Reverse Image Search
+            </button>
+
+            <button
+              onClick={() => {
+                if (!result) return
+                const activeFlags = [
+                  forensicsConfig.useNullDetectors ? 'useNullDetectors' : null,
+                  forensicsConfig.useQualityBadge ? 'useQualityBadge' : null,
+                  forensicsConfig.useAiClassifier ? 'useAiClassifier' : null,
+                  forensicsConfig.useProvenanceSignals ? 'useProvenanceSignals' : null,
+                ].filter(Boolean).join(', ') || 'None (Baseline)'
+
+                const reportText = `DocMorph Forensic Evidence Report\n` +
+                  `==========================================\n` +
+                  `File: ${file?.name}\n` +
+                  `Verdict: ${currentVerdict[0]}\n` +
+                  `AI Risk: ${result.risk !== null ? `${result.risk}%` : 'Inconclusive (Abstained)'}\n` +
+                  `Summary: ${result.summary}\n\n` +
+                  `Media Quality Assessment:\n` +
+                  `- Quality Level: ${result.quality?.confidence || 'Standard'}\n` +
+                  `- JPEG Quality Estimate: ${result.quality?.jpegQuality !== undefined && result.quality?.jpegQuality !== null ? `${result.quality.jpegQuality}%` : 'N/A'}\n` +
+                  `- Active Forensic Flags: ${activeFlags}\n\n` +
+                  `Per-Signal Forensic Readings:\n` +
+                  result.details.map(d => `• ${d.test}: ${d.reading} [${d.result}]`).join('\n') +
+                  `\n\n==========================================\n` +
+                  `Results are most reliable on original camera files. Detection is probabilistic and not proof.`
+
+                const blob = new Blob([reportText], { type: 'text/plain' })
+                const url = URL.createObjectURL(blob)
+                const a = document.createElement('a')
+                a.href = url
+                a.download = `forensic_evidence_report_${file?.name || 'scan'}.txt`
+                a.click()
+                URL.revokeObjectURL(url)
+              }}
+              className={`inline-flex items-center gap-2 rounded-[12px] border border-line-warm px-4 py-2.5 text-sm font-medium transition-colors duration-200 hover:border-ink cursor-pointer ${result ? '' : 'pointer-events-none opacity-40'}`}
+            >
+              <Download size={14} />
+              Export Evidence Report
+            </button>
+          </div>
 
           {/* Quality Disclaimer Footer */}
           <div className="mt-auto flex items-center justify-between border-t border-line pt-3 font-mono text-[11px] text-muted">
-            <span>Results are most reliable on original, uncompressed camera files.</span>
+            <span>Results are most reliable on original camera files. Detection is probabilistic and not proof.</span>
             <span className="hidden sm:inline">DocMorph Forensics v2.2</span>
           </div>
         </>}

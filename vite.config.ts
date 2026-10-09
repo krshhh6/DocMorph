@@ -2,6 +2,7 @@ import { defineConfig, type HtmlTagDescriptor, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import path from 'node:path'
+import fs from 'node:fs'
 
 import siteConfiguration from './.figma/make/site.json'
 
@@ -14,12 +15,15 @@ export default defineConfig(({ mode }) => {
   return {
     base: process.env.FIGMA_PUBLIC_URL ? `${process.env.FIGMA_PUBLIC_URL}/` : '/',
     build: {
+      outDir: path.resolve('C:/Python Project/dist'),
+      emptyOutDir: true,
       sourcemap: emitSourcemaps ? 'inline' : false,
       minify: !emitSourcemaps,
     },
     plugins: [
-react(),
+      react(),
       tailwindcss(),
+      localModelPlugin(),
       figmaSiteConfiguration(siteConfiguration),
       figmaErrorOverlayReplay(),
       figmaReactRefreshBoundaryFallback(),
@@ -359,6 +363,30 @@ function figmaMakeKitPlugin(options: { storiesGlob: string | string[] }): Plugin
         } catch (err) {
           next(err as Error)
         }
+      })
+    },
+  }
+}
+
+/** Serves static ONNX neural network models from C:/Python Project/models directly in the browser */
+function localModelPlugin(): Plugin {
+  return {
+    name: 'local-model-server',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const url = (req.url || '').split('?')[0]
+        if (url.startsWith('/models/')) {
+          const fileName = url.slice('/models/'.length)
+          const filePath = path.resolve('C:/Python Project/models', fileName)
+          if (fs.existsSync(filePath)) {
+            res.setHeader('Content-Type', 'application/octet-stream')
+            res.setHeader('Content-Length', fs.statSync(filePath).size)
+            res.setHeader('Access-Control-Allow-Origin', '*')
+            fs.createReadStream(filePath).pipe(res)
+            return
+          }
+        }
+        next()
       })
     },
   }

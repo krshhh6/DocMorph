@@ -10,6 +10,9 @@
 
 import { assessInputQuality, decideVerdict } from './qualityGate'
 import type { QualityReport } from './qualityGate'
+import { forensicsConfig } from './forensicsConfig'
+import { classifyImageAi } from './aiClassifier'
+import { computeDHash, checkKnownAiHash, saveScannedHash } from './perceptualHash'
 
 export interface ForensicDetail {
   test: string
@@ -373,13 +376,137 @@ export async function auditImageClient(file: File, img: HTMLImageElement): Promi
   const hasWm = wmResult.hasWatermark
   const quality = await assessInputQuality(img, file, camData.hasCamera)
 
+  // Pretrained AI Classifier Signal (Phase 4)
+  let classifierScore: number | null = null
+  let classifierModel = ''
+  if (forensicsConfig.useAiClassifier) {
+    const filePath = (file as any).filePath || (file as any).path
+    const res = await classifyImageAi(img, filePath)
+    classifierScore = res.aiProbability
+    classifierModel = res.modelName
+  }
+
+  // Perceptual Hash & Provenance Memory (Phase 5)
+  let dHash = ''
+  let hashMatch: { matched: boolean; distance: number; prevVerdict?: string } = {
+    matched: false,
+    distance: 64,
+  }
+
+  if (forensicsConfig.useProvenanceSignals) {
+    dHash = computeDHash(img)
+    if (dHash) {
+      hashMatch = await checkKnownAiHash(dHash)
+    }
+  }
+
   let aiRisk: number | null = 10.0
   let verdict = 'Authentic Real Photograph'
   let verdictType: 'danger' | 'warn' | 'ok' | 'info' = 'ok'
   let summary = ''
   let caveat: string | null = null
 
-  if (hasWm || aiTags.length > 0) {
+  if (forensicsConfig.useQualityBadge) {
+    // Phase 3: ADVISORY MODE
+    // 1. Compute raw baseline score & verdict first
+    let baseScore = 10.0
+    let baseVerdict = 'Authentic Real Photograph'
+    let baseVerdictType: 'danger' | 'warn' | 'ok' | 'info' = 'ok'
+    let baseSummary = 'Natural sensor textures and uniform compression verified.'
+
+    if (hasWm || aiTags.length > 0) {
+      baseScore = 99.8
+      baseVerdict = 'Confirmed AI Generated'
+      baseVerdictType = 'danger'
+      const provParts: string[] = []
+      if (hasWm) provParts.push('Google Gemini Sparkle Watermark')
+      if (aiTags.length > 0) provParts.push(...aiTags)
+      baseSummary = `Official AI provenance detected (${provParts.join(', ')}).`
+    } else if (camData.hasCamera) {
+      baseScore = 4.2
+      baseVerdict = 'Authentic Real Photograph'
+      baseVerdictType = 'ok'
+      baseSummary = `Original camera hardware confirmed: ${camData.cameraName}.`
+    } else if (elaVar > 1.3) {
+      baseScore = 72.4
+      baseVerdict = 'Likely AI Generated'
+      baseVerdictType = 'warn'
+      baseSummary = 'Compression inconsistency detected across image blocks.'
+    } else {
+      baseScore = hasRealLens ? 15.0 : 48.0
+      baseVerdict = baseScore < 50 ? 'Authentic Real Photograph' : 'Likely AI Generated'
+      baseVerdictType = baseScore < 50 ? 'ok' : 'warn'
+      baseSummary = hasRealLens
+        ? 'Natural sensor textures and uniform compression verified.'
+        : 'Natural sensor textures verified.'
+    }
+
+    // 2. Blend classifier if enabled (Phase 4)
+    let blendedScore = baseScore
+    if (forensicsConfig.useAiClassifier && classifierScore !== null) {
+      const w = forensicsConfig.aiClassifierWeight
+      blendedScore = (1 - w) * baseScore + w * classifierScore
+
+      // Neural AI Guard: When no camera hardware is present and neural classifier finds high AI probability,
+      // ensure metadata stripping cannot fool the detector
+      if (classifierScore >= 75 && !camData.hasCamera) {
+        blendedScore = Math.max(blendedScore, classifierScore)
+        baseVerdict = 'Likely AI Generated'
+        baseVerdictType = 'warn'
+        baseSummary = 'Synthetic rendering textures detected by neural network analysis.'
+      }
+    }
+
+    // 3. Provenance Signal: Perceptual Hash match can only INCREASE suspicion (Phase 5)
+    if (forensicsConfig.useProvenanceSignals && hashMatch.matched) {
+      blendedScore = Math.max(blendedScore, 92.0)
+      baseVerdict = 'Confirmed AI Generated'
+      baseVerdictType = 'danger'
+      baseSummary = `Matches a previously flagged AI image (perceptual distance: ${hashMatch.distance}).`
+    }
+
+    // 4. Check for hard degradation (real screenshot, < 300px, or jpeg quality < 45)
+    const hasHardDegradation = quality.flags.some(f => f.severity === 'hard')
+    const isUncertainBand = baseScore >= 30 && baseScore <= 70
+
+    // 5. Abstain (Inconclusive) ONLY when BOTH conditions hold:
+    // (a) hard degradation AND (b) baseline score in uncertain band (30-70).
+    // Never override confident baseline verdict (score <= 25 or >= 75).
+    if (hasHardDegradation && isUncertainBand) {
+      aiRisk = null
+      verdict = 'Inconclusive'
+      verdictType = 'info'
+      caveat = null
+      const reasonsStr = quality.flags.map(f => f.label).join(', ')
+      summary = `This image appears to be a screenshot or heavily re-compressed copy (${reasonsStr}). Forensic signals are unreliable, so we can't give a trustworthy result. Try the original file.`
+    } else {
+      aiRisk = Number(blendedScore.toFixed(1))
+      verdict = aiRisk < 50 ? 'Authentic Real Photograph' : 'Likely AI Generated'
+      verdictType = aiRisk < 50 ? 'ok' : 'warn'
+      summary = baseSummary
+
+      // Soft flags (WhatsApp, moderate compression, lower resolution, Pinterest)
+      const hasSoft = quality.flags.some(f => f.severity === 'soft') || quality.confidence === 'reduced'
+      if (hasSoft) {
+        caveat = 'Reduced confidence'
+        if (verdict === 'Authentic Real Photograph') {
+          verdict = 'Likely Real'
+        }
+      } else {
+        caveat = null
+      }
+
+      // Phase 5 Wording Rule: Never claim "Real" as proof
+      if (forensicsConfig.useProvenanceSignals) {
+        if (verdict === 'Authentic Real Photograph') {
+          verdict = 'Likely Real'
+        }
+        if (verdict === 'Likely Real' && !caveat) {
+          summary = 'No evidence of AI generation found.'
+        }
+      }
+    }
+  } else if (hasWm || aiTags.length > 0) {
     aiRisk = 99.8
     verdict = 'Confirmed AI Generated'
     verdictType = 'danger'
@@ -516,15 +643,15 @@ export async function auditImageClient(file: File, img: HTMLImageElement): Promi
     const details: ForensicDetail[] = [
       {
         test: 'AI Generator Check (Midjourney/DALL-E)',
-        reading: aiRisk !== null ? `${aiRisk.toFixed(1)}% AI Risk` : 'Low Confidence',
-        result: aiRisk !== null ? vitDiag : 'Inconclusive',
+        reading: aiRisk !== null ? `${aiRisk.toFixed(1)}% AI Risk` : (forensicsConfig.useNullDetectors ? 'Not enough data' : 'Low Confidence'),
+        result: aiRisk !== null ? vitDiag : (forensicsConfig.useNullDetectors ? 'N/A' : 'Inconclusive'),
         statusType: aiRisk !== null ? vitType : 'info',
       },
       {
         test: 'Face Swap / Deepfake Check',
-        reading: '< 1% Risk',
-        result: 'No Face Swap',
-        statusType: 'ok',
+        reading: forensicsConfig.useNullDetectors ? 'Not enough data' : '< 1% Risk',
+        result: forensicsConfig.useNullDetectors ? 'N/A' : 'No Face Swap',
+        statusType: forensicsConfig.useNullDetectors ? 'info' : 'ok',
       },
       {
         test: 'AI Watermark Scan',
@@ -577,14 +704,20 @@ export async function auditImageClient(file: File, img: HTMLImageElement): Promi
     {
       test: 'AI Generator Check (Midjourney/DALL-E)',
       reading: aiRisk !== null ? `${aiRisk.toFixed(1)}% AI Risk` : 'Not enough data',
-      result: aiRisk !== null ? vitDiag : 'Inconclusive',
+      result: aiRisk !== null ? vitDiag : (forensicsConfig.useNullDetectors ? 'N/A' : 'Inconclusive'),
       statusType: aiRisk !== null ? vitType : 'info',
     },
     {
       test: 'Face Swap / Deepfake Check',
-      reading: aiRisk !== null ? `${(aiRisk * 0.05).toFixed(1)}% Risk` : 'Not enough data',
-      result: aiRisk !== null ? 'No Face Swap' : 'N/A',
-      statusType: aiRisk !== null ? 'ok' : 'info',
+      reading: forensicsConfig.useNullDetectors
+        ? 'Not enough data'
+        : (aiRisk !== null ? `${(aiRisk * 0.05).toFixed(1)}% Risk` : 'Not enough data'),
+      result: forensicsConfig.useNullDetectors
+        ? 'N/A'
+        : (aiRisk !== null ? 'No Face Swap' : 'N/A'),
+      statusType: forensicsConfig.useNullDetectors
+        ? 'info'
+        : (aiRisk !== null ? 'ok' : 'info'),
     },
     {
       test: 'AI Watermark Scan',
@@ -617,6 +750,20 @@ export async function auditImageClient(file: File, img: HTMLImageElement): Promi
       statusType: aiTags.length > 0 ? 'danger' : 'info',
     },
   ]
+
+  if (forensicsConfig.useProvenanceSignals && dHash) {
+    const isAi = (aiRisk !== null && aiRisk >= 50) || verdictType === 'danger' || verdictType === 'warn'
+    saveScannedHash(dHash, verdict, isAi)
+
+    details.push({
+      test: 'Known AI Image Match (dHash)',
+      reading: hashMatch.matched
+        ? `Matches previously flagged AI (dist: ${hashMatch.distance})`
+        : 'Unique visual hash',
+      result: hashMatch.matched ? 'Flagged AI Match' : 'No Match',
+      statusType: hashMatch.matched ? 'danger' : 'ok',
+    })
+  }
 
   return {
     verdict,

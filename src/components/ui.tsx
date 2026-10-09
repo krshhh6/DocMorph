@@ -20,9 +20,9 @@ export function Eyebrow({ children, className = '' }: { children: ReactNode; cla
   return <p className={`font-mono text-[10px] uppercase tracking-[0.16em] ${className}`}>{children}</p>
 }
 
-export function PrimaryButton({ children, onClick, sparkle, className = '' }: { children: ReactNode; onClick?: () => void; sparkle?: boolean; className?: string }) {
+export function PrimaryButton({ children, onClick, sparkle, disabled, className = '' }: { children: ReactNode; onClick?: () => void; sparkle?: boolean; disabled?: boolean; className?: string }) {
   return (
-    <button onClick={onClick} className={`inline-flex min-h-12 items-center gap-6 rounded-[12px] bg-btn px-6 text-sm font-semibold text-btn-ink transition-colors duration-200 hover:opacity-90 ${className}`}>
+    <button disabled={disabled} onClick={disabled ? undefined : onClick} className={`inline-flex min-h-12 items-center gap-6 rounded-[12px] bg-btn px-6 text-sm font-semibold text-btn-ink transition-colors duration-200 hover:opacity-90 ${disabled ? 'opacity-60 cursor-not-allowed' : ''} ${className}`}>
       <span className="flex items-center gap-2">
         {sparkle && <Sparkles size={15} className="text-amber" />}
         {children}

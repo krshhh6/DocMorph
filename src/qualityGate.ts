@@ -1,3 +1,5 @@
+import { forensicsConfig } from './forensicsConfig'
+
 export type Confidence = 'high' | 'reduced' | 'unreliable'
 export type Source = 'whatsapp' | 'screenshot' | 'webcam' | 'unknown'
 
@@ -95,7 +97,10 @@ export async function assessInputQuality(
   }
 
   if (!hasExif && (PINTEREST_WIDTHS.includes(W) || PINTEREST_WIDTHS.includes(H))) {
-    flags.push({ label: 'Social-media resized copy', severity: 'hard' })
+    flags.push({
+      label: 'Social-media resized copy',
+      severity: forensicsConfig.useQualityBadge ? 'soft' : 'hard',
+    })
   }
 
   if (minSide < 300) {
