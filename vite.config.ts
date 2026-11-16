@@ -15,7 +15,7 @@ export default defineConfig(({ mode }) => {
   return {
     base: process.env.FIGMA_PUBLIC_URL ? `${process.env.FIGMA_PUBLIC_URL}/` : '/',
     build: {
-      outDir: path.resolve('C:/Python Project/dist'),
+      outDir: (process.env.VERCEL || process.env.CI || process.platform !== 'win32') ? 'dist' : path.resolve('C:/Python Project/dist'),
       emptyOutDir: true,
       sourcemap: emitSourcemaps ? 'inline' : false,
       minify: !emitSourcemaps,
