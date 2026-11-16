@@ -4,11 +4,11 @@ import Team from './components/Team'
 import { MobileBar, NAV, Sidebar, Splash } from './components/Shell'
 import type { PageId } from './components/Shell'
 import { ArrowLeft } from 'lucide-react'
-import { ATS, Compressor, Converter, Deepfake, History, Passport, Summarizer } from './components/Tools'
+import { ATS, Compressor, Converter, Deepfake, History, Passport, Plagiarism, Summarizer } from './components/Tools'
 
-const PAGES = { converter: Converter, compressor: Compressor, ats: ATS, passport: Passport, summarizer: Summarizer, deepfake: Deepfake, history: History, team: Team }
+const PAGES = { converter: Converter, compressor: Compressor, deepfake: Deepfake, ats: ATS, passport: Passport, summarizer: Summarizer, plagiarism: Plagiarism, history: History, team: Team }
 
-const VALID_PAGES: PageId[] = ['converter', 'compressor', 'ats', 'passport', 'summarizer', 'deepfake', 'history', 'team']
+const VALID_PAGES: PageId[] = ['converter', 'compressor', 'deepfake', 'ats', 'passport', 'summarizer', 'plagiarism', 'history', 'team']
 
 const getInitialPage = (): PageId => {
   const hash = window.location.hash.replace('#', '') as PageId

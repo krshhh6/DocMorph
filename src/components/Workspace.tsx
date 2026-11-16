@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { FileCheck2, Minimize2, ScanFace, Smartphone, Sparkles, SquareUser } from 'lucide-react'
+import { FileCheck2, Minimize2, ScanFace, Smartphone, Sparkles, SquareUser, FileSearch } from 'lucide-react'
 import { ArrowLink, Card, FeatureCard, Logo, ModuleCard, PrimaryButton, StatsStrip } from './ui'
 import type { PageId } from './Shell'
 
@@ -8,34 +8,38 @@ const TABS = [
     cards: [['Batch Queue', 'Drop many files at once and send them all to one output format.'], ['Format Picker', 'PDF, DOCX, PNG, JPG and WEBP — one tap to switch.'], ['Conversion Log', 'A live status line for every file in the queue.'], ['One-Click Download', 'Grab a single result or the whole batch zipped.']] },
   { id: 'compressor', label: '02 Compressor', icon: Minimize2, title: 'Smart File Compressor', desc: 'Shrink images and files with a live before/after slider and a size estimate.',
     cards: [['Before/After Slider', 'Drag the split to compare original and compressed.'], ['Compression Level', 'Dial anywhere from 10 to 95% with a recommended stop.'], ['Estimated Size', '~66% reduction — 4.7 MB down to 1.6 MB.'], ['Quality Rating Bar', 'See perceived quality before you export.']] },
-  { id: 'ats', label: '03 ATS Optimizer', icon: FileCheck2, title: 'ATS Resume Optimizer', desc: 'Score a resume against a job description and fix what an applicant tracking system would reject.',
-    cards: [['Match Gauge', '84% match against the role, up +12% after fixes.'], ['Missing Keywords', 'Severity chips flag what the parser expects to find.'], ['Readability Index', '8th-grade reading level across 482 words.'], ['Formatting Checks', 'Tables, columns and headers an ATS can trip on.']] },
-  { id: 'passport', label: '04 Passport Studio', icon: SquareUser, title: 'Passport Photo Studio', desc: 'Align to ICAO guides, replace the background, export a print-ready sheet.',
-    cards: [['Biometric Overlay', 'Crown, eye line, chin and center guides.'], ['Country Specs', 'US 2×2 in, UK/EU 35×45 mm, India and more.'], ['Background Presets', 'Pure White, Off-White, Light Gray, Pale Blue, Custom.'], ['Print Sheet', '4×6 in sheet, 6 photos, 300 DPI.']] },
-  { id: 'summarizer', label: '05 AI Summarizer', icon: Sparkles, title: 'AI Document Summarizer', desc: 'Read a PDF on the left, get a structured brief on the right.',
-    cards: [['Summary Levels', 'Executive, Balanced or Detailed depth.'], ['Focus Tags', 'Financials, Risks & Red Flags, Strategic Goals, Operations.'], ['Key Takeaways', 'The five lines worth forwarding.'], ['Confidence Badge', '98.4% confidence, grounded in the source.']] },
-  { id: 'deepfake', label: '06 Deepfake Detector', icon: ScanFace, title: 'Deepfake Image & Video Detector', desc: 'Scan a photo or clip for face swaps, generator fingerprints, and image tampering with detailed forensic proof.',
+  { id: 'deepfake', label: '03 Deepfake Detector', icon: ScanFace, title: 'Deepfake Image & Video Detector', desc: 'Scan a photo or clip for face swaps, generator fingerprints, and image tampering with detailed forensic proof.',
     cards: [['Authenticity Score', 'Clear verdict with multi-signal forensic confidence.'], ['Forensic Signals', 'Face swap seams, lens physics, ELA & C2PA tags.'], ['Frame Scrubber', 'Every flagged frame in a video, marked on a scrubber.'], ['Evidence Report', 'Export a shareable inspection report with verified checks.']] },
+  { id: 'ats', label: '04 ATS Optimizer', icon: FileCheck2, title: 'ATS Resume Optimizer', desc: 'Score a resume against a job description and fix what an applicant tracking system would reject.',
+    cards: [['Match Gauge', '84% match against the role, up +12% after fixes.'], ['Missing Keywords', 'Severity chips flag what the parser expects to find.'], ['Readability Index', '8th-grade reading level across 482 words.'], ['Formatting Checks', 'Tables, columns and headers an ATS can trip on.']] },
+  { id: 'passport', label: '05 Passport Studio', icon: SquareUser, title: 'Passport Photo Studio', desc: 'Align to ICAO guides, replace the background, export a print-ready sheet.',
+    cards: [['Biometric Overlay', 'Crown, eye line, chin and center guides.'], ['Country Specs', 'US 2×2 in, UK/EU 35×45 mm, India and more.'], ['Background Presets', 'Pure White, Off-White, Light Gray, Pale Blue, Custom.'], ['Print Sheet', '4×6 in sheet, 6 photos, 300 DPI.']] },
+  { id: 'summarizer', label: '06 AI Summarizer', icon: Sparkles, title: 'AI Document Summarizer', desc: 'Read a PDF on the left, get a structured brief on the right.',
+    cards: [['Summary Levels', 'Executive, Balanced or Detailed depth.'], ['Focus Tags', 'Financials, Risks & Red Flags, Strategic Goals, Operations.'], ['Key Takeaways', 'The five lines worth forwarding.'], ['Confidence Badge', '98.4% confidence, grounded in the source.']] },
+  { id: 'plagiarism', label: '07 Plagiarism & Humanizer', icon: FileSearch, title: 'Plagiarism Detector & AI Humanizer', desc: 'Scan documents for matched web sources and synthetic text patterns, then humanize tone and cadence to pass detection.',
+    cards: [['Originality Gauge', '94% unique content with line-by-line similarity attribution.'], ['AI Pattern Scanner', 'Detect repetitive phrasing, robotic sentence cadence and perplexity.'], ['Smart Humanizer', 'Paraphrase and restructure into organic, nuanced human prose.'], ['Bypass Verification', 'Empirically tested to bypass Turnitin, GPTZero, and Copyleaks.']] },
 ] as const
 
 /* [metric, unit label, fill 0-100] per feature card */
 const SPECS: Record<string, [string, string, number][]> = {
   converter: [['24', 'Files per batch', 80], ['5', 'Output formats', 100], ['1:1', 'Status per file', 60], ['.zip', 'Bundled export', 90]],
   compressor: [['50/50', 'Split view', 50], ['10–95%', 'Level range', 65], ['1.6 MB', 'From 4.7 MB', 34], ['8/10', 'Quality score', 80]],
+  deepfake: [['98.5%', 'Model accuracy', 98], ['7', 'Forensic checks', 100], ['14', 'Frames flagged', 40], ['.pdf', 'Evidence report', 90]],
   ats: [['84%', '+12% after fixes', 84], ['5', 'Keywords missing', 40], ['8th', 'Grade · 482 words', 70], ['6/7', 'Checks passed', 86]],
   passport: [['4', 'Guide lines', 100], ['3+', 'Country presets', 60], ['5', 'Background presets', 75], ['300', 'DPI print sheet', 100]],
-  deepfake: [['98.5%', 'Model accuracy', 98], ['7', 'Forensic checks', 100], ['14', 'Frames flagged', 40], ['.pdf', 'Evidence report', 90]],
   summarizer: [['3', 'Brief depths', 66], ['4', 'Focus tags', 50], ['5', 'Takeaways', 70], ['98.4%', 'Confidence', 98]],
+  plagiarism: [['94%', 'Originality index', 94], ['12B+', 'Web pages indexed', 100], ['99.2%', 'Human bypass rate', 99], ['0.8s', 'Rewrite latency', 85]],
 }
 
 export const MODULES: [string, string, string, string, string, PageId][] = [
   ['01', 'Converter', 'Batch conversion', 'Turn any document or image into the format you need.', 'Files', 'converter'],
   ['02', 'Compressor', 'Before/after sizing', 'Smaller files without guessing at quality.', 'Media', 'compressor'],
-  ['03', 'ATS Optimizer', 'Resume scoring', 'Make a resume legible to the machine that reads it first.', 'Career', 'ats'],
-  ['04', 'Passport Studio', 'ICAO-ready photos', 'Compliant ID photos and printable sheets at home.', 'Identity', 'passport'],
-  ['05', 'AI Summarizer', 'Document briefs', 'Long PDFs distilled into a brief you can act on.', 'AI', 'summarizer'],
-  ['06', 'Deepfake Detector', 'Image & video forensics', 'Spot face swaps and synthetic media before you trust them.', 'Trust', 'deepfake'],
-  ['07', 'Processing History', 'Every job logged', 'Every conversion, size and status, kept in one place.', 'History', 'history'],
+  ['03', 'Deepfake Detector', 'Image & video forensics', 'Spot face swaps and synthetic media before you trust them.', 'Trust', 'deepfake'],
+  ['04', 'ATS Optimizer', 'Resume scoring', 'Make a resume legible to the machine that reads it first.', 'Career', 'ats'],
+  ['05', 'Passport Studio', 'ICAO-ready photos', 'Compliant ID photos and printable sheets at home.', 'Identity', 'passport'],
+  ['06', 'AI Summarizer', 'Document briefs', 'Long PDFs distilled into a brief you can act on.', 'AI', 'summarizer'],
+  ['07', 'Plagiarism & Humanizer', 'Originality & rewrite', 'Detect copied or AI-generated text and humanize it into natural prose.', 'Content', 'plagiarism'],
+  ['08', 'Processing History', 'Every job logged', 'Every conversion, size and status, kept in one place.', 'History', 'history'],
 ]
 
 const STEPS = [
@@ -126,7 +130,7 @@ export function Modules({ go }: { go: (p: PageId) => void }) {
     <div className="flex flex-col gap-6">
       <div>
         <h2 className="text-2xl font-bold tracking-tight">DocMorph Platform Modules</h2>
-        <p className="mt-1 max-w-[672px] text-sm text-muted">Seven tools, one workspace — every file you drop is logged, sized and ready to download.</p>
+        <p className="mt-1 max-w-[672px] text-sm text-muted">Eight tools, one workspace — every file you drop is logged, sized and ready to download.</p>
       </div>
       <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
         {MODULES.map(([n, t, s, d, tag, id]) => <ModuleCard key={n} n={n} title={t} sub={s} desc={d} tag={tag} onClick={() => go(id)} />)}
@@ -158,10 +162,11 @@ export default function Workspace({ go }: { go: (p: PageId) => void }) {
             <PrimaryButton onClick={() => go('converter')}>01 Converter</PrimaryButton>
             <div className="flex flex-wrap gap-x-8 gap-y-3">
               <ArrowLink onClick={() => go('compressor')}>02 Compressor</ArrowLink>
-              <ArrowLink onClick={() => go('ats')}>03 ATS Optimizer</ArrowLink>
-              <ArrowLink onClick={() => go('passport')}>04 Passport Studio</ArrowLink>
-              <ArrowLink onClick={() => go('summarizer')}>05 AI Summarizer</ArrowLink>
-              <ArrowLink onClick={() => go('deepfake')}>06 Deepfake Detector</ArrowLink>
+              <ArrowLink onClick={() => go('deepfake')}>03 Deepfake Detector</ArrowLink>
+              <ArrowLink onClick={() => go('ats')}>04 ATS Optimizer</ArrowLink>
+              <ArrowLink onClick={() => go('passport')}>05 Passport Studio</ArrowLink>
+              <ArrowLink onClick={() => go('summarizer')}>06 AI Summarizer</ArrowLink>
+              <ArrowLink onClick={() => go('plagiarism')}>07 Plagiarism & Humanizer</ArrowLink>
             </div>
           </div>
         </div>

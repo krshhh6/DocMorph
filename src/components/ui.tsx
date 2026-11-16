@@ -22,7 +22,7 @@ export function Eyebrow({ children, className = '' }: { children: ReactNode; cla
 
 export function PrimaryButton({ children, onClick, sparkle, disabled, className = '' }: { children: ReactNode; onClick?: () => void; sparkle?: boolean; disabled?: boolean; className?: string }) {
   return (
-    <button disabled={disabled} onClick={disabled ? undefined : onClick} className={`inline-flex min-h-12 items-center gap-6 rounded-[12px] bg-btn px-6 text-sm font-semibold text-btn-ink transition-colors duration-200 hover:opacity-90 ${disabled ? 'opacity-60 cursor-not-allowed' : ''} ${className}`}>
+    <button onClick={disabled ? undefined : onClick} disabled={disabled} className={`inline-flex min-h-12 items-center gap-6 rounded-[12px] bg-btn px-6 text-sm font-semibold text-btn-ink transition-colors duration-200 hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed ${className}`}>
       <span className="flex items-center gap-2">
         {sparkle && <Sparkles size={15} className="text-amber" />}
         {children}

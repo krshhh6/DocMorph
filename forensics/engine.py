@@ -180,7 +180,10 @@ def run_model(pil_img: Image.Image):
         logits = sess.run(None, {'pixel_values': tensor})[0][0]
         exp = np.exp(logits - np.max(logits))
         probs = exp / np.sum(exp)
-        return float(probs[0] * 100.0), float(probs[1] * 100.0)
+        # Classifier output: index 0 = Real, index 1 = Fake (Deepfake)
+        fake_prob = float(probs[1] * 100.0)
+        real_prob = float(probs[0] * 100.0)
+        return fake_prob, real_prob
     except Exception:
         return None, None
 

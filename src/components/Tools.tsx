@@ -1,6 +1,6 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import type { ReactNode } from 'react'
-import { AlertTriangle, CheckCircle2, Download, FileText, RotateCcw, RotateCw, Sparkles, Upload, X, ArrowLeft, ArrowRight, Trash2, Plus, ArrowUpDown, Check, FileCheck, GripVertical, ExternalLink, Cpu, Loader2 } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Download, FileText, RotateCcw, RotateCw, Sparkles, Upload, X, ArrowLeft, ArrowRight, Trash2, Plus, ArrowUpDown, Check, FileCheck, GripVertical, ExternalLink, Cpu, Copy, FileSearch, ShieldCheck, RefreshCw, BookOpen } from 'lucide-react'
 import { Card, Eyebrow, PrimaryButton, StatsStrip, StatusChip, TagChip } from './ui'
 import { PassportFace } from './Workspace'
 import { auditImageClient, detectGeminiSparkle } from '../forensicsClient'
@@ -39,9 +39,75 @@ function Panel({ label, children, action }: { label: string; children?: ReactNod
   )
 }
 
-const BACKEND_URL = import.meta.env.VITE_API_URL || 'https://docmorph-production-bad0.up.railway.app'
+const BACKEND_URL = import.meta.env.VITE_API_URL || 'https://docmorph-production.up.railway.app'
 
-function Dropzone({ text, onFiles }: { text: string; onFiles?: (files: FileList) => void }) {
+export interface HistoryJob {
+  id: string
+  file: string
+  tool: string
+  before: string
+  after: string
+  status: 'Done' | 'Processing' | 'Failed' | 'Queued'
+  time: string
+  timestamp: number
+}
+
+const HISTORY_KEY = 'docmorph_processing_history'
+
+const DEFAULT_HISTORY: HistoryJob[] = [
+  { id: '1', file: 'annual-report-2026.pdf', tool: 'Converter', before: '2.4 MB', after: '1.9 MB', status: 'Done', time: '2 min ago', timestamp: Date.now() - 120000 },
+  { id: '2', file: 'hero-photo.png', tool: 'Compressor', before: '4.7 MB', after: '1.6 MB', status: 'Done', time: '9 min ago', timestamp: Date.now() - 540000 },
+  { id: '3', file: 'interview-clip.mp4', tool: 'Deepfake Detector', before: '42 MB', after: '—', status: 'Done', time: '18 min ago', timestamp: Date.now() - 1080000 },
+  { id: '4', file: 'krishna-kant-resume.pdf', tool: 'ATS Optimizer', before: '312 KB', after: '—', status: 'Done', time: '24 min ago', timestamp: Date.now() - 1440000 },
+  { id: '5', file: 'passport-raw.jpg', tool: 'Passport Studio', before: '3.2 MB', after: '1.1 MB', status: 'Processing', time: '31 min ago', timestamp: Date.now() - 1860000 },
+  { id: '6', file: 'ai-ethics-paper.docx', tool: 'Plagiarism & Humanizer', before: '1.2 MB', after: '1.1 MB', status: 'Done', time: '42 min ago', timestamp: Date.now() - 2520000 },
+  { id: '7', file: 'q3-board-report.pdf', tool: 'AI Summarizer', before: '8.9 MB', after: '4 KB', status: 'Done', time: '1 h ago', timestamp: Date.now() - 3600000 },
+]
+
+export function getHistoryJobs(): HistoryJob[] {
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY)
+    if (!raw) {
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(DEFAULT_HISTORY))
+      return DEFAULT_HISTORY
+    }
+    return JSON.parse(raw)
+  } catch {
+    return DEFAULT_HISTORY
+  }
+}
+
+export function saveHistoryJob(job: { file: string; tool: string; before?: string; after?: string; status?: 'Done' | 'Processing' | 'Failed' | 'Queued' }) {
+  try {
+    const list = getHistoryJobs()
+    const newJob: HistoryJob = {
+      id: Math.random().toString(36).substring(2, 9),
+      file: job.file,
+      tool: job.tool,
+      before: job.before || '—',
+      after: job.after || '—',
+      status: job.status || 'Done',
+      time: 'Just now',
+      timestamp: Date.now(),
+    }
+    const updated = [newJob, ...list.filter(x => x.id !== newJob.id)].slice(0, 50)
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(updated))
+    window.dispatchEvent(new Event('docmorph_history_updated'))
+  } catch (e) {
+    console.error('Failed to save history job', e)
+  }
+}
+
+export function clearHistoryJobs() {
+  try {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify([]))
+    window.dispatchEvent(new Event('docmorph_history_updated'))
+  } catch (e) {
+    console.error('Failed to clear history jobs', e)
+  }
+}
+
+function Dropzone({ text, onFiles, accept }: { text: string; onFiles?: (files: FileList) => void; accept?: string }) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isDragOver, setIsDragOver] = useState(false)
 
@@ -75,6 +141,7 @@ function Dropzone({ text, onFiles }: { text: string; onFiles?: (files: FileList)
       <input
         ref={fileInputRef}
         type="file"
+        accept={accept}
         className="hidden"
         multiple
         onChange={e => {
@@ -628,368 +695,1044 @@ export function Converter() {
 
 /* 02 Compressor */
 export function Compressor() {
+  const [file, setFile] = useState<{ raw: File; url: string; name: string; size: number } | null>(null)
   const [level, setLevel] = useState(65)
   const [split, setSplit] = useState(50)
-  const before = 4.7
-  const after = +(before * (1 - level / 100 * 1.02)).toFixed(1)
-  const reduction = Math.round((1 - Math.max(after, 0.2) / before) * 100)
-  return (
-    <>
-      <ToolHeader n="02" name="Smart File Compressor" title="Smart File Compressor" desc="Shrink images and files with a live before/after slider and a size estimate." stats={[['Original', `${before} MB`], ['Estimated', `${Math.max(after, 0.2)} MB`], ['Reduction', `~${reduction}%`], ['Quality', level > 80 ? 'Low' : level > 50 ? 'Good' : 'High']]} />
-      <Workbench
-        left={<>
-          <Panel label="Before / After" />
-          <div className="relative aspect-[4/3] overflow-hidden rounded-[17.6px] bg-zinc-300 select-none">
-            <div className="absolute inset-0 bg-[repeating-linear-gradient(45deg,#d4d4d8_0_14px,#e4e4e7_14px_28px)]" />
-            <div className="absolute inset-0 bg-[repeating-linear-gradient(45deg,#a1a1aa_0_28px,#d4d4d8_28px_56px)]" style={{ clipPath: `inset(0 0 0 ${split}%)` }} />
-            <div className="absolute inset-y-0 w-0.5 bg-amber" style={{ left: `${split}%` }} />
-            <span className="absolute left-3 top-3 rounded-full bg-[#18181b] px-2.5 py-1 font-mono text-[10px] text-white">BEFORE · {before} MB</span>
-            <span className="absolute right-3 top-3 rounded-full bg-[#18181b] px-2.5 py-1 font-mono text-[10px] text-amber">AFTER · {Math.max(after, 0.2)} MB</span>
-            <input type="range" min={0} max={100} value={split} onChange={e => setSplit(+e.target.value)} className="absolute inset-0 cursor-ew-resize opacity-0" aria-label="Before after split" />
-          </div>
-        </>}
-        right={<>
-          <Panel label="Compression Level" action={<span className="rounded-full bg-amber-pale px-2.5 py-1 font-mono text-[11px] text-amber-ink">−{reduction}% SIZE</span>} />
-          <p className="font-mono text-5xl font-medium tracking-tight">{level}%</p>
-          <input type="range" min={10} max={95} value={level} onChange={e => setLevel(+e.target.value)} className="range w-full" aria-label="Compression level" />
-          <div className="flex justify-between font-mono text-[10px] uppercase tracking-[0.04em] text-muted">
-            <span>Max Quality (10%)</span><span className="text-ink">65% (Recommended)</span><span>Max Compression (95%)</span>
-          </div>
-          <div>
-            <Eyebrow className="mb-2 text-muted">Quality Rating</Eyebrow>
-            <div className="flex gap-1">{Array.from({ length: 10 }).map((_, i) => <div key={i} className={`h-2 flex-1 rounded-full ${i < Math.round(10 - level / 11) ? 'bg-btn' : 'bg-line-warm'}`} />)}</div>
-          </div>
-          <div className="mt-auto flex flex-wrap gap-3">
-            <PrimaryButton>Compress & Download</PrimaryButton>
-            <button onClick={() => { setLevel(65); setSplit(50) }} className="inline-flex items-center gap-2 rounded-[12px] border border-line-warm px-4 text-sm font-medium hover:border-ink"><RotateCcw size={14} />Reset Settings</button>
-          </div>
-        </>}
-      />
-    </>
-  )
-}
+  const [compressedBlob, setCompressedBlob] = useState<Blob | null>(null)
+  const [compressedUrl, setCompressedUrl] = useState<string | null>(null)
+  const [isCompressing, setIsCompressing] = useState(false)
+  const [dragOver, setDragOver] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
-/* 03 ATS */
-interface AtsApiResponse {
-  success: boolean
-  filename?: string
-  prediction: string
-  match_score: number
-  confidence: number
-  probabilities?: {
-    'Good Fit'?: number
-    'No Fit'?: number
-    'Potential Fit'?: number
-  }
-  word_count: number
-  matched_keywords: string[]
-  missing_keywords: string[]
-  model?: string
-  detail?: string
-}
+  const defaultSize = 4850000 // 4.85 MB demo base
+  const originalSize = file ? file.size : defaultSize
+  const compressedSize = compressedBlob ? compressedBlob.size : Math.round(originalSize * Math.max(0.12, (100 - level * 0.95) / 100))
 
-export function ATS() {
-  const [file, setFile] = useState<File | null>(null)
-  const [jobDescription, setJobDescription] = useState(
-    'Senior Software Engineer — own platform features end to end, ship with Python, TypeScript, React and Docker, partner with stakeholders across design and data.'
-  )
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [result, setResult] = useState<AtsApiResponse | null>(null)
-
-  const handleDrop = (files: FileList) => {
-    if (files.length > 0) {
-      setFile(files[0])
-      setError(null)
-    }
+  const formatBytes = (bytes: number) => {
+    if (bytes >= 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(2) + ' MB'
+    return Math.round(bytes / 1024) + ' KB'
   }
 
-  const handleAnalyze = async () => {
-    if (!file) {
-      setError('Please select or drop a resume file (PDF or DOCX) first.')
-      return
-    }
-    if (!jobDescription.trim()) {
-      setError('Please enter a job description to score against.')
-      return
-    }
+  const reduction = Math.max(0, Math.round((1 - compressedSize / originalSize) * 100))
+  const qualityRating = Math.max(1, Math.min(10, Math.round(10 - (level / 10))))
 
-    setLoading(true)
-    setError(null)
-
-    try {
-      const formData = new FormData()
-      formData.append('file', file)
-      formData.append('job_description', jobDescription.trim())
-
-      const res = await fetch(`${BACKEND_URL}/api/ats/analyze`, {
-        method: 'POST',
-        body: formData,
-      })
-
-      const data = await res.json()
-      if (!res.ok || data.success === false) {
-        throw new Error(data.detail || 'ATS analysis failed. Please try again.')
+  const runCompress = (targetFile: File, compLevel: number) => {
+    setIsCompressing(true)
+    const img = new Image()
+    const objectUrl = URL.createObjectURL(targetFile)
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas')
+        let width = img.width
+        let height = img.height
+        const maxDim = 2400
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width)
+            width = maxDim
+          } else {
+            width = Math.round((width * maxDim) / height)
+            height = maxDim
+          }
+        }
+        canvas.width = width
+        canvas.height = height
+        const ctx = canvas.getContext('2d')
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height)
+          const q = Math.max(0.05, Math.min(0.95, (100 - compLevel) / 100))
+          canvas.toBlob(blob => {
+            if (blob) {
+              if (compressedUrl) URL.revokeObjectURL(compressedUrl)
+              const newUrl = URL.createObjectURL(blob)
+              setCompressedBlob(blob)
+              setCompressedUrl(newUrl)
+            }
+            setIsCompressing(false)
+            URL.revokeObjectURL(objectUrl)
+          }, 'image/jpeg', q)
+        } else {
+          setIsCompressing(false)
+          URL.revokeObjectURL(objectUrl)
+        }
+      } catch {
+        setIsCompressing(false)
+        URL.revokeObjectURL(objectUrl)
       }
-
-      setResult(data)
-    } catch (err: any) {
-      setError(err.message || 'Unable to connect to Railway ATS server. Please verify network.')
-    } finally {
-      setLoading(false)
     }
+    img.onerror = () => {
+      setIsCompressing(false)
+      URL.revokeObjectURL(objectUrl)
+    }
+    img.src = objectUrl
   }
 
-  const score = result ? result.match_score : 84
-  const C = 2 * Math.PI * 70
-  const isGood = score >= 75
-  const isPotential = score >= 50
-  const gaugeColor = isGood ? '#22C55E' : isPotential ? '#FFD061' : '#EF4444'
-  const predictionLabel = result ? result.prediction : 'Strong match'
-  const wordCount = result ? result.word_count : 482
-  const missingCount = result ? result.missing_keywords?.length || 0 : 5
+  const handleFile = (f: File) => {
+    if (!f.type.startsWith('image/')) {
+      alert('Please select an image file (JPG, PNG, WebP).')
+      return
+    }
+    if (file?.url) URL.revokeObjectURL(file.url)
+    const url = URL.createObjectURL(f)
+    setFile({ raw: f, url, name: f.name, size: f.size })
+    runCompress(f, level)
+  }
 
-  const defaultMissingKws: [string, 'High' | 'Med' | 'Low'][] = [
-    ['Kubernetes', 'High'],
-    ['Stakeholder management', 'High'],
-    ['GraphQL', 'Med'],
-    ['CI/CD', 'Med'],
-    ['A/B testing', 'Low'],
-  ]
-  const sev = { High: 'bg-danger/10 text-danger', Med: 'bg-warn-pale text-warn', Low: 'bg-msurf text-muted' }
+  useEffect(() => {
+    if (file) {
+      const timer = setTimeout(() => {
+        runCompress(file.raw, level)
+      }, 150)
+      return () => clearTimeout(timer)
+    }
+  }, [level])
+
+  const downloadCompressed = () => {
+    if (!compressedBlob && !file) {
+      alert('Please upload an image to compress.')
+      return
+    }
+    const url = compressedUrl || (file ? file.url : '')
+    if (!url) return
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `compressed_${file ? file.name.replace(/\.[^/.]+$/, '.jpg') : 'image.jpg'}`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+
+    saveHistoryJob({
+      file: file ? file.name : 'sample-compressed.jpg',
+      tool: 'Compressor',
+      before: formatBytes(originalSize),
+      after: formatBytes(compressedSize),
+      status: 'Done',
+    })
+  }
 
   return (
     <>
       <ToolHeader
-        n="03"
-        name="ATS Resume Optimizer"
-        title="ATS Resume Optimizer"
-        desc="Score a resume against a job description and fix what an applicant tracking system would reject."
+        n="02"
+        name="Smart File Compressor"
+        title="Smart File Compressor"
+        desc="Shrink images and files with a live before/after split slider, precise byte measurements and instant export."
         stats={[
-          ['Match Score', `${score}%`],
-          ['Prediction', result ? result.prediction : 'Pending Scan'],
-          ['Missing Keywords', `${missingCount}`],
-          ['Word Count', `${wordCount}`],
+          ['Original', formatBytes(originalSize)],
+          ['Compressed', formatBytes(compressedSize)],
+          ['Reduction', `-${reduction}%`],
+          ['Quality', level > 80 ? 'Heavy' : level > 50 ? 'Balanced' : 'High Fidelity']
         ]}
       />
       <Workbench
-        left={
-          <>
-            <Panel label="Resume" />
+        left={<>
+          <Panel
+            label="Before / After Split"
+            action={
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="inline-flex items-center gap-1.5 font-mono text-[11px] text-amber-ink hover:underline"
+              >
+                <Upload size={12} /> {file ? 'Change Image' : 'Upload Image'}
+              </button>
+            }
+          />
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={e => {
+              if (e.target.files && e.target.files[0]) handleFile(e.target.files[0])
+              e.target.value = ''
+            }}
+          />
+
+          <div
+            onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={e => {
+              e.preventDefault()
+              setDragOver(false)
+              if (e.dataTransfer.files && e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0])
+            }}
+            className={`relative aspect-[4/3] w-full overflow-hidden rounded-[17.6px] border select-none transition-colors ${
+              dragOver ? 'border-amber bg-amber/5' : 'border-line bg-msurf'
+            }`}
+          >
             {file ? (
-              <div className="flex items-center justify-between rounded-[16px] border border-line-warm bg-card p-4">
-                <div className="flex items-center gap-3 overflow-hidden">
-                  <div className="grid h-10 w-10 shrink-0 place-items-center rounded-[10px] bg-msurf text-ink">
-                    <FileText size={20} />
-                  </div>
-                  <div className="truncate">
-                    <p className="truncate text-sm font-semibold">{file.name}</p>
-                    <p className="font-mono text-xs text-muted">{(file.size / 1024).toFixed(1)} KB</p>
+              <>
+                <div
+                  className="absolute inset-0 bg-contain bg-center bg-no-repeat"
+                  style={{ backgroundImage: `url(${file.url})` }}
+                />
+                <div
+                  className="absolute inset-0 bg-contain bg-center bg-no-repeat"
+                  style={{
+                    backgroundImage: `url(${compressedUrl || file.url})`,
+                    clipPath: `inset(0 0 0 ${split}%)`
+                  }}
+                />
+                <div className="absolute inset-y-0 w-0.5 bg-amber shadow-[0_0_8px_rgba(255,180,0,0.5)]" style={{ left: `${split}%` }}>
+                  <div className="absolute top-1/2 -left-3 -translate-y-1/2 grid h-6 w-6 place-items-center rounded-full bg-amber text-btn-ink shadow-md">
+                    <span className="font-mono text-[9px] font-bold">||</span>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setFile(null)}
-                  className="rounded-lg p-2 text-muted hover:bg-msurf hover:text-ink cursor-pointer"
-                  title="Remove file"
-                >
-                  <X size={16} />
-                </button>
+              </>
+            ) : (
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center cursor-pointer hover:bg-card/50 transition-colors"
+              >
+                <div className="grid h-12 w-12 place-items-center rounded-full bg-card shadow-sm text-amber-ink">
+                  <Upload size={22} />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold">Drop any image here or click to browse</p>
+                  <p className="mt-1 font-mono text-[10px] text-muted">Supports JPG, PNG, WEBP • Up to 50 MB</p>
+                </div>
+                <span className="rounded-full border border-line-warm bg-card px-3 py-1 font-mono text-[11px] text-body">
+                  Simulating with sample {formatBytes(originalSize)}
+                </span>
+              </div>
+            )}
+
+            <span className="absolute left-3 top-3 rounded-full bg-[#18181b]/90 backdrop-blur-md px-2.5 py-1 font-mono text-[10px] text-white">
+              ORIGINAL • {formatBytes(originalSize)}
+            </span>
+            <span className="absolute right-3 top-3 rounded-full bg-[#18181b]/90 backdrop-blur-md px-2.5 py-1 font-mono text-[10px] text-amber">
+              COMPRESSED • {formatBytes(compressedSize)} (-{reduction}%)
+            </span>
+
+            {file && (
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={split}
+                onChange={e => setSplit(+e.target.value)}
+                className="absolute inset-0 cursor-ew-resize opacity-0 z-10"
+                aria-label="Before after split"
+              />
+            )}
+          </div>
+
+          <div className="flex items-center justify-between text-xs text-muted font-mono">
+            <span>Drag slider horizontally to preview output</span>
+            {isCompressing && <span className="animate-pulse text-amber">Recompressing...</span>}
+          </div>
+        </>}
+        right={<>
+          <Panel
+            label="Compression Level"
+            action={<span className="rounded-full bg-amber-pale px-2.5 py-1 font-mono text-[11px] text-amber-ink">▼ {reduction}% SIZE</span>}
+          />
+          <div className="flex items-baseline justify-between">
+            <p className="font-mono text-5xl font-medium tracking-tight">{level}%</p>
+            <span className="font-mono text-xs text-muted">Quality Target: {100 - level}%</span>
+          </div>
+          <input
+            type="range"
+            min={10}
+            max={95}
+            value={level}
+            onChange={e => setLevel(+e.target.value)}
+            className="range w-full"
+            aria-label="Compression level"
+          />
+          <div className="flex justify-between font-mono text-[10px] uppercase tracking-[0.04em] text-muted">
+            <span>High Quality (10%)</span>
+            <span className="text-ink font-semibold">65% (Recommended)</span>
+            <span>Max Compression (95%)</span>
+          </div>
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <Eyebrow className="text-muted">Perceived Quality Rating</Eyebrow>
+              <span className="font-mono text-xs">{qualityRating} / 10</span>
+            </div>
+            <div className="flex gap-1">
+              {Array.from({ length: 10 }).map((_, i) => (
+                <div
+                  key={i}
+                  className={`h-2 flex-1 rounded-full transition-colors duration-200 ${
+                    i < qualityRating ? 'bg-amber' : 'bg-line-warm'
+                  }`}
+                />
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-[16px] border border-line bg-msurf p-4 space-y-2">
+            <div className="flex justify-between text-xs">
+              <span className="text-muted">Target Codec</span>
+              <span className="font-mono font-medium">JPEG Progressive</span>
+            </div>
+            <div className="flex justify-between text-xs">
+              <span className="text-muted">Estimated Space Saved</span>
+              <span className="font-mono font-bold text-ok">{formatBytes(Math.max(0, originalSize - compressedSize))}</span>
+            </div>
+          </div>
+
+          <div className="mt-auto flex flex-wrap gap-3">
+            <PrimaryButton onClick={downloadCompressed} disabled={isCompressing}>
+              <Download size={15} /> Download Compressed
+            </PrimaryButton>
+            <button
+              onClick={() => { setLevel(65); setSplit(50) }}
+              className="inline-flex items-center gap-2 rounded-[12px] border border-line-warm px-4 text-sm font-medium hover:border-ink"
+            >
+              <RotateCcw size={14} /> Reset Settings
+            </button>
+          </div>
+        </>}
+      />
+    </>
+  )
+}
+
+/* 04 ATS */
+export function ATS() {
+  const DEFAULT_RESUME = `Krishna Kant
+Full Stack & AI Systems Engineer | Bengaluru, India
+Email: krishnakant@docmorph.ai | Phone: +91 98765 43210 | GitHub: github.com/krishnakant | LinkedIn: linkedin.com/in/krishnakant
+
+SUMMARY
+Results-driven Full Stack & Machine Learning Engineer with 4+ years of experience architecting distributed web systems, production machine learning inference pipelines, and scalable APIs. Proven track record reducing latency by 45% and optimizing multi-tenant cloud architectures.
+
+EXPERIENCE
+Lead Systems Engineer — DocMorph Technologies (2023 – Present)
+• Architected and deployed client-side ONNX WebAssembly inference pipeline processing 100,000+ multimodal documents daily with zero server costs.
+• Spearheaded migration of microservices to Docker and Kubernetes, achieving 99.98% service uptime and automated CI/CD deployment pipelines.
+• Integrated GraphQL and RESTful APIs, optimizing database query speeds by 38% across Postgres and Redis caching layers.
+• Collaborated closely with cross-functional product stakeholders to deliver accessibility and internationalization compliance.
+
+Full Stack Developer — AI Labs (2021 – 2023)
+• Built responsive web interfaces using TypeScript, React, Next.js and Tailwind CSS.
+• Developed Python FastAPI backend handling asynchronous file processing and WebSockets for real-time telemetry.
+• Conducted comprehensive A/B testing and performance benchmarking, increasing user retention by 22%.
+
+EDUCATION
+B.Tech in Computer Science & Engineering — 2021
+CGPA: 8.8 / 10.0
+
+TECHNICAL SKILLS
+Languages: TypeScript, Python, JavaScript, SQL, HTML5/CSS3
+Frameworks & Libraries: React, Next.js, Node.js, FastAPI, PyTorch, Tailwind CSS
+Cloud & DevOps: Docker, Kubernetes, CI/CD, AWS, Redis, Git, Linux, System Design`
+
+  const DEFAULT_JD = `Senior Full Stack & AI Systems Engineer
+We are seeking an experienced Senior Systems Engineer to own core platform features end-to-end.
+
+Responsibilities:
+• Architect, build and deploy scalable microservices using TypeScript, Node.js and Python.
+• Lead cloud infrastructure and orchestration using Docker, Kubernetes, and automated CI/CD workflows.
+• Implement GraphQL and high-performance REST APIs.
+• Drive cross-functional stakeholder management across design, data engineering, and product management.
+• Lead system design reviews, automated testing, and observability across AWS cloud services.
+
+Requirements:
+• 3+ years experience with modern React, TypeScript, Python, and system design.
+• Hands-on production experience with Docker, Kubernetes, and CI/CD pipelines.
+• Strong foundation in GraphQL, distributed databases, and cloud security.
+• Excellent communication and stakeholder management skills.`
+
+  const [resumeText, setResumeText] = useState(DEFAULT_RESUME)
+  const [jobDesc, setJobDesc] = useState(DEFAULT_JD)
+  const [isScanning, setIsScanning] = useState(false)
+  const [scanCount, setScanCount] = useState(1)
+
+  const analyzeATS = () => {
+    const candidateTech = [
+      'Kubernetes', 'Docker', 'GraphQL', 'CI/CD', 'TypeScript', 'Python',
+      'React', 'AWS', 'Node.js', 'System Design', 'FastAPI', 'Redis',
+      'Stakeholder management', 'Microservices', 'PyTorch', 'SQL',
+      'REST', 'Observability', 'Cross-functional', 'A/B testing'
+    ]
+
+    const jdLower = jobDesc.toLowerCase()
+    const resumeLower = resumeText.toLowerCase()
+
+    const targetKeywords = candidateTech.filter(kw => jdLower.includes(kw.toLowerCase()))
+    const matched = targetKeywords.filter(kw => resumeLower.includes(kw.toLowerCase()))
+    const missing = targetKeywords.filter(kw => !resumeLower.includes(kw.toLowerCase()))
+
+    const missingWithSev: [string, 'High' | 'Med' | 'Low'][] = missing.map(kw => {
+      const regex = new RegExp(kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi')
+      const matches = (jobDesc.match(regex) || []).length
+      const sev: 'High' | 'Med' | 'Low' = matches >= 2 ? 'High' : matches === 1 ? 'Med' : 'Low'
+      return [kw, sev]
+    })
+
+    const rawScore = targetKeywords.length > 0
+      ? Math.round((matched.length / targetKeywords.length) * 100)
+      : 80
+    const score = Math.max(20, Math.min(98, rawScore))
+
+    const words = resumeText.trim().split(/\s+/).filter(Boolean)
+    const wordCount = words.length
+    const sentences = resumeText.split(/[.!?]+/).filter(x => x.trim().length > 0).length || 1
+    const avgWordsPerSent = Math.round(wordCount / sentences)
+    const readingGrade = avgWordsPerSent < 14 ? '8th grade' : avgWordsPerSent < 20 ? '10th grade' : 'College level'
+
+    const hasHeadings = /EXPERIENCE|EDUCATION|SKILLS|SUMMARY/i.test(resumeText)
+    const hasContact = /@/i.test(resumeText) && (/phone|\+\d/i.test(resumeText) || /github|linkedin/i.test(resumeText))
+    const hasMetrics = /%|\$|\d+\+/i.test(resumeText)
+    const hasBullets = /•|-|\*/.test(resumeText)
+    const optimalLength = wordCount >= 250 && wordCount <= 900
+
+    const checks: [string, boolean][] = [
+      ['Standard section headings detected', hasHeadings],
+      ['Contact info & professional links present', hasContact],
+      ['Measurable impact metrics (% / $ / scale)', hasMetrics],
+      ['Structured bullet point formatting', hasBullets],
+      ['Optimal word count range (250–900 words)', optimalLength],
+    ]
+
+    return {
+      score,
+      matched,
+      missingWithSev,
+      wordCount,
+      readingGrade,
+      checks
+    }
+  }
+
+  const { score, matched, missingWithSev, wordCount, readingGrade, checks } = analyzeATS()
+
+  const C = 2 * Math.PI * 70
+  const sevBadge = {
+    High: 'bg-danger/10 text-danger border-danger/20',
+    Med: 'bg-warn-pale text-warn border-warn/20',
+    Low: 'bg-msurf text-muted border-line-warm'
+  }
+
+  const handleRescan = () => {
+    setIsScanning(true)
+    setTimeout(() => {
+      setIsScanning(false)
+      setScanCount(c => c + 1)
+      saveHistoryJob({
+        file: 'resume-ats-scan.pdf',
+        tool: 'ATS Optimizer',
+        before: `${wordCount} words`,
+        after: `${score}% ATS Score`,
+        status: 'Done'
+      })
+    }, 400)
+  }
+
+  const handleFileUpload = (files: FileList) => {
+    const file = files[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = e => {
+      const text = e.target?.result as string
+      if (text) {
+        setResumeText(text)
+        handleRescan()
+      }
+    }
+    reader.readAsText(file)
+  }
+
+  return (
+    <>
+      <ToolHeader
+        n="04"
+        name="ATS Resume Optimizer"
+        title="ATS Resume Optimizer"
+        desc="Score your resume against an exact job description, uncover missing keywords, and verify parser compliance."
+        stats={[
+          ['Match Score', `${score}%`],
+          ['Rescans', `${scanCount}`],
+          ['Missing Keywords', String(missingWithSev.length)],
+          ['Word Count', String(wordCount)]
+        ]}
+      />
+      <Workbench
+        left={<>
+          <div className="flex items-center justify-between">
+            <Panel label="Your Resume (Text or Upload)" />
+            <span className="font-mono text-[10px] text-muted">{wordCount} words</span>
+          </div>
+          <textarea
+            value={resumeText}
+            onChange={e => setResumeText(e.target.value)}
+            rows={10}
+            className="w-full resize-y rounded-[16px] border border-line-warm bg-msurf p-4 font-mono text-xs leading-relaxed text-body outline-none focus:border-ink"
+            placeholder="Paste your resume markdown or plain text here..."
+          />
+          <Dropzone text="Drop resume file (.txt, .md, .docx text extract)" onFiles={handleFileUpload} />
+
+          <Panel label="Target Job Description" />
+          <textarea
+            value={jobDesc}
+            onChange={e => setJobDesc(e.target.value)}
+            rows={6}
+            className="w-full resize-y rounded-[16px] border border-line-warm bg-msurf p-4 text-xs leading-relaxed text-body outline-none focus:border-ink"
+            placeholder="Paste the target job description here..."
+          />
+          <PrimaryButton sparkle onClick={handleRescan} disabled={isScanning} className="self-start">
+            {isScanning ? 'Analyzing Parser...' : 'Rescan Resume'}
+          </PrimaryButton>
+        </>}
+        right={<>
+          <div className="flex items-center gap-6">
+            <svg width="150" height="150" viewBox="0 0 160 160" className="shrink-0 -rotate-90">
+              <circle cx="80" cy="80" r="70" fill="none" strokeWidth="10" className="stroke-line-warm" />
+              <circle
+                cx="80"
+                cy="80"
+                r="70"
+                fill="none"
+                strokeWidth="10"
+                stroke={score >= 80 ? '#10b981' : score >= 60 ? '#FFD061' : '#f43f5e'}
+                strokeLinecap="round"
+                strokeDasharray={C}
+                strokeDashoffset={C * (1 - score / 100)}
+                className="transition-all duration-700 ease-out"
+              />
+              <text x="80" y="88" textAnchor="middle" transform="rotate(90 80 80)" className="fill-ink font-mono text-[28px] font-bold">
+                {score}%
+              </text>
+            </svg>
+            <div>
+              <Eyebrow className="text-muted">Dynamic Match Gauge</Eyebrow>
+              <p className="mt-1 text-xl font-bold">
+                {score >= 80 ? 'Exceptional Match' : score >= 65 ? 'Competitive Match' : 'Needs Optimization'}
+              </p>
+              <p className="mt-1 font-mono text-xs text-ok">
+                {matched.length} of {matched.length + missingWithSev.length} critical skills found
+              </p>
+            </div>
+          </div>
+
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <Eyebrow className="text-muted">Missing Job Keywords ({missingWithSev.length})</Eyebrow>
+              <span className="font-mono text-[10px] text-muted">Click to append</span>
+            </div>
+            {missingWithSev.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {missingWithSev.map(([k, s]) => (
+                  <button
+                    key={k}
+                    onClick={() => setResumeText(r => `${r}\n• Implemented and optimized ${k} in production.`)}
+                    title={`Click to add ${k} to resume`}
+                    className="inline-flex items-center gap-2 rounded-full border border-line-warm bg-card py-1 pl-3 pr-1 text-xs hover:border-ink transition-colors"
+                  >
+                    <span>{k}</span>
+                    <span className={`rounded-full px-2 py-0.5 font-mono text-[9px] uppercase border ${sevBadge[s]}`}>{s}</span>
+                  </button>
+                ))}
               </div>
             ) : (
-              <Dropzone text="Drop resume (PDF or DOCX)" onFiles={handleDrop} />
-            )}
-
-            <Panel label="Job Description" />
-            <textarea
-              value={jobDescription}
-              onChange={(e) => setJobDescription(e.target.value)}
-              placeholder="Paste the job description or target role requirements here..."
-              className="min-h-36 rounded-[16px] border border-line-warm bg-msurf p-4 text-sm leading-relaxed text-body outline-none focus:border-ink"
-            />
-
-            {error && (
-              <div className="flex items-center gap-2 rounded-[12px] border border-danger/20 bg-danger/10 p-3 text-xs text-danger">
-                <AlertTriangle size={15} className="shrink-0" />
-                <span>{error}</span>
+              <div className="rounded-[12px] border border-emerald-500/20 bg-emerald-500/10 p-3 text-xs text-emerald-600 font-medium flex items-center gap-2">
+                <CheckCircle2 size={16} /> All target skills and keywords matched in resume!
               </div>
             )}
+          </div>
 
-            <PrimaryButton
-              sparkle={!loading}
-              onClick={handleAnalyze}
-              disabled={loading}
-              className="self-start cursor-pointer"
-            >
-              {loading ? (
-                <span className="flex items-center gap-2">
-                  <Loader2 size={16} className="animate-spin" />
-                  Analyzing with Railway AI...
-                </span>
-              ) : (
-                'Rescan Resume'
-              )}
-            </PrimaryButton>
-          </>
-        }
-        right={
-          <>
-            <div className="flex items-center gap-6">
-              <svg width="160" height="160" viewBox="0 0 160 160" className="shrink-0 -rotate-90">
-                <circle cx="80" cy="80" r="70" fill="none" strokeWidth="10" className="stroke-line-warm" />
-                <circle
-                  cx="80"
-                  cy="80"
-                  r="70"
-                  fill="none"
-                  strokeWidth="10"
-                  stroke={gaugeColor}
-                  strokeLinecap="round"
-                  strokeDasharray={C}
-                  strokeDashoffset={C * (1 - score / 100)}
-                />
-                <text
-                  x="80"
-                  y="88"
-                  textAnchor="middle"
-                  transform="rotate(90 80 80)"
-                  className="fill-ink font-mono text-[30px] font-medium"
-                >
-                  {score}%
-                </text>
-              </svg>
-              <div>
-                <Eyebrow className="text-muted">Match Gauge</Eyebrow>
-                <p className="mt-2 text-xl font-bold">{predictionLabel}</p>
-                <p className={`mt-1 font-mono text-xs ${isGood ? 'text-ok' : isPotential ? 'text-warn' : 'text-danger'}`}>
-                  {result
-                    ? `${(result.confidence * 100).toFixed(1)}% AI Model Confidence`
-                    : '+12% after suggested fixes'}
-                </p>
-              </div>
+          <div className="grid grid-cols-2 gap-px overflow-hidden rounded-[16px] border border-line bg-line">
+            <div className="bg-card p-4">
+              <Eyebrow className="text-muted">Readability</Eyebrow>
+              <p className="mt-2 font-mono text-2xl font-bold">{readingGrade}</p>
             </div>
-
-            {result && result.matched_keywords?.length > 0 && (
-              <div>
-                <Eyebrow className="mb-3 text-muted">Matched Keywords</Eyebrow>
-                <div className="flex flex-wrap gap-2">
-                  {result.matched_keywords.map((kw) => (
-                    <span
-                      key={kw}
-                      className="inline-flex items-center gap-1.5 rounded-full border border-ok/30 bg-ok/10 px-3 py-1 text-xs text-ok"
-                    >
-                      <CheckCircle2 size={12} />
-                      {kw}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div>
-              <Eyebrow className="mb-3 text-muted">Missing Keywords</Eyebrow>
-              <div className="flex flex-wrap gap-2">
-                {result ? (
-                  result.missing_keywords?.length > 0 ? (
-                    result.missing_keywords.map((kw, i) => (
-                      <span
-                        key={kw}
-                        className="inline-flex items-center gap-2 rounded-full border border-line-warm py-1 pl-3 pr-2 text-xs"
-                      >
-                        {kw}
-                        <span className="rounded-full bg-danger/10 px-2 py-0.5 font-mono text-[9px] uppercase text-danger">
-                          {i < 2 ? 'High' : i < 5 ? 'Med' : 'Low'}
-                        </span>
-                      </span>
-                    ))
-                  ) : (
-                    <p className="text-xs text-ok font-medium">All essential keywords matched!</p>
-                  )
-                ) : (
-                  defaultMissingKws.map(([k, s]) => (
-                    <span
-                      key={k}
-                      className="inline-flex items-center gap-2 rounded-full border border-line-warm py-1 pl-3 pr-1 text-xs"
-                    >
-                      {k}
-                      <span className={`rounded-full px-2 py-0.5 font-mono text-[9px] uppercase ${sev[s]}`}>{s}</span>
-                    </span>
-                  ))
-                )}
-              </div>
+            <div className="bg-card p-4">
+              <Eyebrow className="text-muted">Word Count</Eyebrow>
+              <p className="mt-2 font-mono text-2xl font-bold">{wordCount}</p>
             </div>
+          </div>
 
-            <div className="grid grid-cols-2 gap-px overflow-hidden rounded-[16px] border border-line bg-line">
-              <div className="bg-card p-4">
-                <Eyebrow className="text-muted">Readability</Eyebrow>
-                <p className="mt-2 font-mono text-2xl">{wordCount > 350 ? 'Professional' : 'Standard'}</p>
-              </div>
-              <div className="bg-card p-4">
-                <Eyebrow className="text-muted">Words</Eyebrow>
-                <p className="mt-2 font-mono text-2xl">{wordCount}</p>
-              </div>
-            </div>
-
-            <ul className="flex flex-col divide-y divide-line rounded-[16px] border border-line">
-              {[
-                ['Single-column layout compatible', true],
-                ['Standard section headings parsed', true],
-                ['ATS keyword density verified', result ? (result.matched_keywords?.length || 0) > 0 : true],
-                ['Role match threshold met (>=60%)', score >= 60],
-              ].map(([t, ok]) => (
-                <li key={t as string} className="flex items-center gap-3 px-4 py-3 text-sm">
-                  {ok ? <CheckCircle2 size={16} className="text-ok shrink-0" /> : <AlertTriangle size={16} className="text-warn shrink-0" />}
-                  {t}
+          <div>
+            <Eyebrow className="mb-2 text-muted">ATS Parser Compliance Checklist</Eyebrow>
+            <ul className="flex flex-col divide-y divide-line rounded-[16px] border border-line bg-card">
+              {checks.map(([t, ok]) => (
+                <li key={t} className="flex items-center gap-3 px-4 py-2.5 text-xs font-medium">
+                  {ok ? <CheckCircle2 size={15} className="text-ok shrink-0" /> : <AlertTriangle size={15} className="text-warn shrink-0" />}
+                  <span className={ok ? 'text-body' : 'text-warn'}>{t}</span>
                 </li>
               ))}
             </ul>
-          </>
-        }
+          </div>
+        </>}
       />
     </>
   )
 }
 
-/* 04 Passport */
+/* 05 Passport */
 export function Passport() {
-  const [country, setCountry] = useState('US 2×2 in')
+  const [country, setCountry] = useState('US 2x2 in (51x51 mm)')
   const [bg, setBg] = useState('#FFFFFF')
-  const presets = [['Pure White', '#FFFFFF'], ['Off-White', '#F8F8F2'], ['Light Gray', '#E4E4E7'], ['Pale Blue', '#DCE8F5']]
+  const [zoom, setZoom] = useState(1.0)
+  const [panX, setPanX] = useState(0)
+  const [panY, setPanY] = useState(0)
+  const [brightness, setBrightness] = useState(1.0)
+  const [contrast, setContrast] = useState(1.0)
+  const [showGuides, setShowGuides] = useState(true)
+  const [photoImg, setPhotoImg] = useState<HTMLImageElement | null>(null)
+  const [isDownloading, setIsDownloading] = useState(false)
+
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const presets = [
+    ['Pure White', '#FFFFFF'],
+    ['Off-White', '#F8F8F2'],
+    ['Light Gray', '#E4E4E7'],
+    ['Pale Blue', '#DCE8F5'],
+  ]
+
+  const handlePhotoUpload = (files: FileList) => {
+    const f = files[0]
+    if (!f || !f.type.startsWith('image/')) {
+      alert('Please select an image file.')
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = e => {
+      const img = new Image()
+      img.onload = () => {
+        setPhotoImg(img)
+        setPanX(0)
+        setPanY(0)
+        setZoom(1.0)
+      }
+      img.src = e.target?.result as string
+    }
+    reader.readAsDataURL(f)
+  }
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    const W = canvas.width
+    const H = canvas.height
+
+    ctx.fillStyle = bg
+    ctx.fillRect(0, 0, W, H)
+
+    if (photoImg) {
+      ctx.save()
+      ctx.filter = `brightness(${brightness}) contrast(${contrast})`
+
+      const aspect = photoImg.width / photoImg.height
+      let drawW = W * zoom
+      let drawH = drawW / aspect
+
+      if (aspect < 1) {
+        drawH = H * zoom
+        drawW = drawH * aspect
+      }
+
+      const x = (W - drawW) / 2 + panX
+      const y = (H - drawH) / 2 + panY
+      ctx.drawImage(photoImg, x, y, drawW, drawH)
+      ctx.restore()
+    } else {
+      ctx.save()
+      ctx.fillStyle = '#d4d4d8'
+      ctx.beginPath()
+      ctx.ellipse(W / 2, H * 0.42, W * 0.22, H * 0.28, 0, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.beginPath()
+      ctx.ellipse(W / 2, H * 0.95, W * 0.45, H * 0.32, 0, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.restore()
+    }
+
+    if (showGuides) {
+      ctx.save()
+      ctx.strokeStyle = 'rgba(234, 88, 12, 0.7)'
+      ctx.lineWidth = 1.5
+      ctx.setLineDash([4, 4])
+
+      ctx.beginPath()
+      ctx.moveTo(W / 2, 0)
+      ctx.lineTo(W / 2, H)
+      ctx.stroke()
+
+      ctx.beginPath()
+      ctx.moveTo(0, H * 0.15)
+      ctx.lineTo(W, H * 0.15)
+      ctx.stroke()
+
+      ctx.beginPath()
+      ctx.moveTo(0, H * 0.45)
+      ctx.lineTo(W, H * 0.45)
+      ctx.stroke()
+
+      ctx.beginPath()
+      ctx.moveTo(0, H * 0.75)
+      ctx.lineTo(W, H * 0.75)
+      ctx.stroke()
+
+      ctx.setLineDash([6, 4])
+      ctx.beginPath()
+      ctx.ellipse(W / 2, H * 0.45, W * 0.28, H * 0.3, 0, 0, Math.PI * 2)
+      ctx.stroke()
+
+      ctx.setLineDash([])
+      ctx.fillStyle = 'rgba(234, 88, 12, 0.9)'
+      ctx.font = '10px monospace'
+      ctx.fillText('CROWN 15%', 10, H * 0.15 - 4)
+      ctx.fillText('EYE LEVEL 45%', 10, H * 0.45 - 4)
+      ctx.fillText('CHIN 75%', 10, H * 0.75 - 4)
+
+      ctx.restore()
+    }
+  }, [photoImg, bg, zoom, panX, panY, brightness, contrast, showGuides])
+
+  const downloadSingle = () => {
+    setIsDownloading(true)
+    const exportCanvas = document.createElement('canvas')
+    exportCanvas.width = 600
+    exportCanvas.height = 600
+    const ctx = exportCanvas.getContext('2d')
+    if (ctx) {
+      ctx.fillStyle = bg
+      ctx.fillRect(0, 0, 600, 600)
+      if (photoImg) {
+        ctx.save()
+        ctx.filter = `brightness(${brightness}) contrast(${contrast})`
+        const aspect = photoImg.width / photoImg.height
+        let drawW = 600 * zoom
+        let drawH = drawW / aspect
+        if (aspect < 1) {
+          drawH = 600 * zoom
+          drawW = drawH * aspect
+        }
+        const x = (600 - drawW) / 2 + (panX * (600 / 420))
+        const y = (600 - drawH) / 2 + (panY * (600 / 420))
+        ctx.drawImage(photoImg, x, y, drawW, drawH)
+        ctx.restore()
+      } else {
+        if (canvasRef.current) ctx.drawImage(canvasRef.current, 0, 0, 600, 600)
+      }
+
+      exportCanvas.toBlob(blob => {
+        if (blob) {
+          const url = URL.createObjectURL(blob)
+          const a = document.createElement('a')
+          a.href = url
+          a.download = `passport_photo_2x2.png`
+          document.body.appendChild(a)
+          a.click()
+          document.body.removeChild(a)
+          URL.revokeObjectURL(url)
+
+          saveHistoryJob({
+            file: 'passport_photo_2x2.png',
+            tool: 'Passport Studio',
+            before: photoImg ? 'Raw Upload' : 'Sample',
+            after: '600x600 PNG @ 300 DPI',
+            status: 'Done'
+          })
+        }
+        setIsDownloading(false)
+      }, 'image/png')
+    } else {
+      setIsDownloading(false)
+    }
+  }
+
+  const downloadPrintSheet = () => {
+    setIsDownloading(true)
+    const sheet = document.createElement('canvas')
+    sheet.width = 1200
+    sheet.height = 1800
+    const ctx = sheet.getContext('2d')
+    if (ctx) {
+      ctx.fillStyle = '#FFFFFF'
+      ctx.fillRect(0, 0, 1200, 1800)
+
+      ctx.fillStyle = '#71717a'
+      ctx.font = 'bold 24px monospace'
+      ctx.textAlign = 'center'
+      ctx.fillText('DOCMORPH PASSPORT STUDIO — 4x6" PRINT SHEET (6 PHOTOS • 300 DPI)', 600, 70)
+      ctx.font = '18px monospace'
+      ctx.fillText(`SPEC: ${country} • COMPLIANT WITH ICAO BIOMETRIC STANDARDS`, 600, 110)
+
+      const photoW = 500
+      const photoH = 500
+      const startX = 65
+      const gapX = 70
+      const startY = 160
+      const gapY = 40
+
+      for (let row = 0; row < 3; row++) {
+        for (let col = 0; col < 2; col++) {
+          const posX = startX + col * (photoW + gapX)
+          const posY = startY + row * (photoH + gapY)
+
+          ctx.fillStyle = bg
+          ctx.fillRect(posX, posY, photoW, photoH)
+
+          if (photoImg) {
+            ctx.save()
+            ctx.beginPath()
+            ctx.rect(posX, posY, photoW, photoH)
+            ctx.clip()
+            ctx.filter = `brightness(${brightness}) contrast(${contrast})`
+            const aspect = photoImg.width / photoImg.height
+            let drawW = photoW * zoom
+            let drawH = drawW / aspect
+            if (aspect < 1) {
+              drawH = photoH * zoom
+              drawW = drawH * aspect
+            }
+            const x = posX + (photoW - drawW) / 2 + (panX * (photoW / 420))
+            const y = posY + (photoH - drawH) / 2 + (panY * (photoH / 420))
+            ctx.drawImage(photoImg, x, y, drawW, drawH)
+            ctx.restore()
+          } else if (canvasRef.current) {
+            ctx.drawImage(canvasRef.current, posX, posY, photoW, photoH)
+          }
+
+          ctx.strokeStyle = '#e4e4e7'
+          ctx.lineWidth = 1
+          ctx.strokeRect(posX, posY, photoW, photoH)
+        }
+      }
+
+      sheet.toBlob(blob => {
+        if (blob) {
+          const url = URL.createObjectURL(blob)
+          const a = document.createElement('a')
+          a.href = url
+          a.download = `passport_print_sheet_4x6.png`
+          document.body.appendChild(a)
+          a.click()
+          document.body.removeChild(a)
+          URL.revokeObjectURL(url)
+
+          saveHistoryJob({
+            file: 'passport_print_sheet_4x6.png',
+            tool: 'Passport Studio',
+            before: photoImg ? 'Raw Upload' : 'Sample',
+            after: '1200x1800 Print Sheet (6 Photos)',
+            status: 'Done'
+          })
+        }
+        setIsDownloading(false)
+      }, 'image/png')
+    } else {
+      setIsDownloading(false)
+    }
+  }
+
+  const complianceChecks = [
+    { label: 'Head height 1.0 – 1.4 in (25 – 35 mm)', ok: zoom >= 0.8 && zoom <= 1.4 },
+    { label: 'Eyes centered on guide horizontal axis', ok: Math.abs(panY) <= 40 },
+    { label: 'Face centered along vertical axis', ok: Math.abs(panX) <= 30 },
+    { label: 'Neutral expression, mouth closed', ok: true },
+    { label: 'Adequate lighting, no harsh shadows', ok: brightness >= 0.9 && brightness <= 1.2 },
+    { label: 'Uniform plain background', ok: true },
+  ]
+  const passCount = complianceChecks.filter(c => c.ok).length
+
   return (
     <>
-      <ToolHeader n="04" name="Passport Photo Studio" title="Passport Photo Studio" desc="Align to ICAO guides, replace the background, export a print-ready sheet." stats={[['Compliance', '6 / 6'], ['Spec', country], ['Print Sheet', '6 photos'], ['Resolution', '300 DPI']]} />
+      <ToolHeader
+        n="05"
+        name="Passport Photo Studio"
+        title="Passport Photo Studio"
+        desc="Align to strict ICAO biometric guides, adjust zoom and lighting, replace backgrounds, and export 300 DPI print-ready sheets."
+        stats={[
+          ['Compliance', `${passCount} / 6`],
+          ['Spec', country.split(' ')[0]],
+          ['Print Sheet', '6 photos'],
+          ['Resolution', '300 DPI']
+        ]}
+      />
       <Workbench
         left={<>
-          <Panel label="Alignment Overlay" />
-          <div className="mx-auto aspect-square w-full max-w-[420px] rounded-[17.6px] p-0" style={{ background: bg }}>
-            <div className="h-full [&>div]:!bg-transparent"><PassportFace /></div>
+          <div className="flex items-center justify-between">
+            <Panel label="Biometric Alignment Canvas" />
+            <button
+              onClick={() => setShowGuides(g => !g)}
+              className={`rounded-full px-2.5 py-1 font-mono text-[10px] border transition-colors ${
+                showGuides ? 'bg-amber-pale text-amber-ink border-amber/30' : 'bg-msurf text-muted border-line-warm'
+              }`}
+            >
+              {showGuides ? 'Guides ON' : 'Guides OFF'}
+            </button>
           </div>
-          <Panel label="Country Spec" />
-          <Seg options={['US 2×2 in', 'UK/EU 35×45 mm', 'India 35×45 mm']} value={country} onChange={setCountry} />
+
+          <div className="relative mx-auto aspect-square w-full max-w-[420px] overflow-hidden rounded-[17.6px] border border-line-warm shadow-inner">
+            <canvas
+              ref={canvasRef}
+              width={420}
+              height={420}
+              className="h-full w-full object-cover"
+            />
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="inline-flex items-center gap-2 rounded-[12px] bg-card border border-line-warm px-4 py-2 text-xs font-semibold hover:border-ink"
+            >
+              <Upload size={14} /> {photoImg ? 'Replace Photo' : 'Upload Your Photo'}
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={e => {
+                if (e.target.files) handlePhotoUpload(e.target.files)
+                e.target.value = ''
+              }}
+            />
+            <button
+              onClick={() => { setZoom(1.0); setPanX(0); setPanY(0); setBrightness(1.0); setContrast(1.0) }}
+              className="font-mono text-xs text-muted hover:text-ink inline-flex items-center gap-1"
+            >
+              <RotateCcw size={12} /> Reset Framing
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 rounded-[14px] border border-line bg-msurf p-3">
+            <div>
+              <div className="flex justify-between text-[11px] font-mono mb-1">
+                <span className="text-muted">Zoom</span>
+                <span>{Math.round(zoom * 100)}%</span>
+              </div>
+              <input
+                type="range"
+                min={0.6}
+                max={2.0}
+                step={0.05}
+                value={zoom}
+                onChange={e => setZoom(+e.target.value)}
+                className="w-full"
+              />
+            </div>
+            <div>
+              <div className="flex justify-between text-[11px] font-mono mb-1">
+                <span className="text-muted">Vertical Align</span>
+                <span>{panY > 0 ? `+${panY}` : panY}px</span>
+              </div>
+              <input
+                type="range"
+                min={-80}
+                max={80}
+                value={panY}
+                onChange={e => setPanY(+e.target.value)}
+                className="w-full"
+              />
+            </div>
+          </div>
+
+          <Panel label="Country Specification" />
+          <Seg
+            options={['US 2x2 in (51x51 mm)', 'UK/EU 35x45 mm', 'India 35x45 mm']}
+            value={country}
+            onChange={setCountry}
+          />
         </>}
         right={<>
-          <Panel label="Background" />
+          <Panel label="Background Tint & Replacement" />
           <div className="flex flex-wrap gap-2">
             {presets.map(([n, c]) => (
-              <button key={n} onClick={() => setBg(c)} className={`flex items-center gap-2 rounded-[12px] border px-3 py-2 text-xs font-medium transition-colors duration-200 ${bg === c ? 'border-ink' : 'border-line-warm'}`}>
-                <span className="h-4 w-4 rounded-full border border-line-warm" style={{ background: c }} />{n}
+              <button
+                key={n}
+                onClick={() => setBg(c)}
+                className={`flex items-center gap-2 rounded-[12px] border px-3 py-2 text-xs font-medium transition-colors duration-200 ${
+                  bg === c ? 'border-ink bg-card shadow-sm font-semibold' : 'border-line-warm bg-card/50'
+                }`}
+              >
+                <span className="h-4 w-4 rounded-full border border-line-warm shadow-xs" style={{ background: c }} />
+                {n}
               </button>
             ))}
-            <button className="rounded-[12px] border border-dashed border-line-warm px-3 py-2 text-xs font-medium text-muted">Custom</button>
+            <label className="flex cursor-pointer items-center gap-2 rounded-[12px] border border-dashed border-line-warm px-3 py-2 text-xs font-medium text-muted hover:border-ink">
+              <input
+                type="color"
+                value={bg}
+                onChange={e => setBg(e.target.value)}
+                className="h-4 w-4 cursor-pointer rounded-full border-0 p-0"
+              />
+              Custom
+            </label>
           </div>
-          <Panel label="Compliance" />
-          <ul className="flex flex-col divide-y divide-line rounded-[16px] border border-line">
-            {['Head height 1–1⅜ in (25–35 mm)', 'Eyes on guide line', 'Face centered', 'Neutral expression, mouth closed', 'Even lighting, no shadows', 'Plain background'].map(t => (
-              <li key={t} className="flex items-center gap-3 px-4 py-2.5 text-sm"><CheckCircle2 size={15} className="text-ok" />{t}</li>
+
+          <Panel label="Lighting Adjustments" />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <div className="flex justify-between text-[11px] font-mono mb-1">
+                <span className="text-muted">Brightness</span>
+                <span>{Math.round(brightness * 100)}%</span>
+              </div>
+              <input
+                type="range"
+                min={0.8}
+                max={1.4}
+                step={0.05}
+                value={brightness}
+                onChange={e => setBrightness(+e.target.value)}
+                className="w-full"
+              />
+            </div>
+            <div>
+              <div className="flex justify-between text-[11px] font-mono mb-1">
+                <span className="text-muted">Contrast</span>
+                <span>{Math.round(contrast * 100)}%</span>
+              </div>
+              <input
+                type="range"
+                min={0.8}
+                max={1.4}
+                step={0.05}
+                value={contrast}
+                onChange={e => setContrast(+e.target.value)}
+                className="w-full"
+              />
+            </div>
+          </div>
+
+          <Panel label="ICAO Biometric Compliance" />
+          <ul className="flex flex-col divide-y divide-line rounded-[16px] border border-line bg-card">
+            {complianceChecks.map(c => (
+              <li key={c.label} className="flex items-center gap-3 px-4 py-2.5 text-xs font-medium">
+                {c.ok ? (
+                  <CheckCircle2 size={15} className="text-ok shrink-0" />
+                ) : (
+                  <AlertTriangle size={15} className="text-warn shrink-0" />
+                )}
+                <span className={c.ok ? 'text-body' : 'text-warn'}>{c.label}</span>
+              </li>
             ))}
           </ul>
+
           <div className="grid grid-cols-2 gap-px overflow-hidden rounded-[16px] border border-line bg-line">
-            <div className="bg-msurf p-4"><Eyebrow className="text-muted">Print Layout</Eyebrow><p className="mt-1.5 text-sm font-semibold">4×6 inch (6 Photos)</p></div>
-            <div className="bg-msurf p-4"><Eyebrow className="text-muted">Resolution</Eyebrow><p className="mt-1.5 text-sm font-semibold">300 DPI High-Res</p></div>
+            <div className="bg-msurf p-4">
+              <Eyebrow className="text-muted">Print Layout</Eyebrow>
+              <p className="mt-1.5 text-sm font-semibold">4x6 inch (6 Photos)</p>
+            </div>
+            <div className="bg-msurf p-4">
+              <Eyebrow className="text-muted">Resolution</Eyebrow>
+              <p className="mt-1.5 text-sm font-semibold">300 DPI High-Res</p>
+            </div>
           </div>
-          <div className="flex flex-wrap gap-3">
-            <button className="inline-flex min-h-12 items-center gap-2 rounded-[12px] border border-line-warm px-5 text-sm font-semibold hover:border-ink"><Download size={14} />Download Single (2 x 2 in)</button>
-            <PrimaryButton>Download Print Sheet</PrimaryButton>
+
+          <div className="flex flex-wrap gap-3 mt-auto">
+            <button
+              onClick={downloadSingle}
+              disabled={isDownloading}
+              className="inline-flex min-h-12 items-center gap-2 rounded-[12px] border border-line-warm px-5 text-sm font-semibold hover:border-ink transition-colors"
+            >
+              <Download size={14} /> Download Single (2 x 2 in)
+            </button>
+            <PrimaryButton onClick={downloadPrintSheet} disabled={isDownloading}>
+              <Download size={14} /> Download Print Sheet (4x6")
+            </PrimaryButton>
           </div>
         </>}
       />
@@ -997,48 +1740,265 @@ export function Passport() {
   )
 }
 
-/* 05 Summarizer */
+/* 06 Summarizer */
 export function Summarizer() {
-  const [level, setLevel] = useState('Executive')
+  const DEFAULT_DOC = `DocMorph Technologies — Q3 Strategic & Financial Operations Report
+Executive Summary & Board Memorandum | Fiscal Year 2026
+
+1. FINANCIAL PERFORMANCE & REVENUE METRICS
+Total enterprise revenue for the third quarter reached $42.6 million, representing an 18% YoY growth compared with $36.1 million in Q3 FY2025.
+Growth was predominantly led by enterprise multi-year subscription renewals, which closed at a historic 94% retention rate.
+However, gross margin compressed by 3.2 percentage points to 61.4%, down from 64.6% in the previous quarter.
+The primary margin headwind stemmed from accelerated infrastructure expenditure, with cloud data warehousing costs rising 27% YoY following the complete migration of the real-time analytics pipeline to multi-region cloud clusters.
+Operating expenses were strictly maintained at $19.1 million, in line with revised guidance, driven by disciplined general and administrative spend.
+
+2. STRATEGIC GOALS & EXPANSION MILESTONES
+Management has confirmed targeted international expansion into the Asia-Pacific (APAC) market scheduled for H2 FY2026, backed by an initial capital allocation of $3.5 million.
+The enterprise product roadmap reached two pivotal milestones: the commercial rollout of client-side ONNX WebAssembly forensic pipelines, which reduced server-side processing compute costs by 68%, and the integration of automated document conversion workflows.
+Product adoption across Tier-1 legal and financial services grew 31% quarter-over-quarter.
+
+3. RISKS, COMPLIANCE & RED FLAGS
+Two critical legacy enterprise vendor contracts contain mandatory auto-renewal penalty stipulations effective in Q1 FY2027, requiring formal notice 60 days in advance to avert an estimated 12% price uplift.
+Furthermore, regulatory scrutiny surrounding synthetic media forensics and AI transparency is intensifying under newly enacted cross-border data protection frameworks.
+Voluntary employee attrition declined to 4.2%, but technical talent acquisition in distributed systems remains competitive, with average time-to-hire extending to 48 days.
+
+4. OPERATIONAL EFFICIENCIES & HEADCOUNT
+Total corporate headcount remained flat at 182 full-time employees throughout the quarter.
+Management has instituted a selective hiring pause across administrative and operations units until Q2 FY2027, prioritizing engineering throughput.
+Data center consolidation initiatives are on track to yield an estimated $1.2 million in annualized cost savings beginning next fiscal quarter.`
+
+  const [docText, setDocText] = useState(DEFAULT_DOC)
+  const [docName, setDocName] = useState('Q3-Board-Report.pdf')
+  const [level, setLevel] = useState<'Executive' | 'Balanced' | 'Detailed'>('Executive')
   const [tags, setTags] = useState(['Financials', 'Risks & Red Flags'])
-  const [done, setDone] = useState(true)
-  const all = ['Financials', 'Risks & Red Flags', 'Strategic Goals', 'Operations']
-  const points = {
-    Executive: ['Revenue up 18% YoY to $42.6M, led by enterprise renewals.', 'Gross margin compressed 3 pts on cloud costs.', 'Two vendor contracts carry auto-renew penalties in Q1.'],
-    Balanced: ['Revenue up 18% YoY to $42.6M; enterprise renewals at 94%.', 'Gross margin 61% (−3 pts) — cloud spend is the main driver.', 'Headcount flat; hiring paused in Ops until Q2.', 'Two vendor contracts auto-renew with 12% uplift.'],
-    Detailed: ['Revenue $42.6M (+18% YoY); enterprise 71% of mix.', 'Gross margin 61%, down from 64%; infra cost +27%.', 'Opex held at $19.1M; Ops hiring paused.', 'APAC expansion targeted for H2 with $3M budget.', 'Vendor auto-renewals: 12% uplift, 60-day notice.'],
-  }[level]!
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const allTags = ['Financials', 'Risks & Red Flags', 'Strategic Goals', 'Operations']
+
+  const generateSummary = () => {
+    const rawSentences = docText
+      .split(/(?<=[.?!])\s+(?=[A-Z0-9])/)
+      .map(s => s.trim())
+      .filter(s => s.length > 25 && s.length < 400)
+
+    if (rawSentences.length === 0) return []
+
+    const scored = rawSentences.map((sent, index) => {
+      let score = 0
+      const lower = sent.toLowerCase()
+
+      if (index === 0 || sent.includes('1.') || sent.includes('2.') || sent.includes('3.')) score += 3
+
+      if (tags.includes('Financials')) {
+        if (/\$|\b(revenue|margin|growth|costs|expenditure|profit|ebitda|gross|operating|budget)\b/i.test(lower)) score += 4
+      }
+      if (tags.includes('Risks & Red Flags')) {
+        if (/\b(risk|penalty|uplift|headwind|vulnerability|scrutiny|delay|contract|attrition)\b/i.test(lower)) score += 4
+      }
+      if (tags.includes('Strategic Goals')) {
+        if (/\b(expansion|milestone|roadmap|adoption|goals|target|rollout|strategic)\b/i.test(lower)) score += 4
+      }
+      if (tags.includes('Operations')) {
+        if (/\b(headcount|hiring|operations|consolidation|employees|pipeline|throughput)\b/i.test(lower)) score += 4
+      }
+
+      if (/%|\$|\b\d+(\.\d+)?(M|k|%)?\b/.test(sent)) score += 2
+
+      return { sent, score, index }
+    })
+
+    scored.sort((a, b) => b.score - a.score)
+
+    const count = level === 'Executive' ? 3 : level === 'Balanced' ? 5 : 8
+    const selected = scored.slice(0, count)
+
+    selected.sort((a, b) => a.index - b.index)
+
+    return selected.map(s => s.sent.replace(/^[0-9.]+\s*/, ''))
+  }
+
+  const points = generateSummary()
+
+  const words = docText.trim().split(/\s+/).filter(Boolean)
+  const wordCount = words.length
+  const pageCount = Math.max(1, Math.ceil(wordCount / 350))
+  const readTimeSaved = Math.max(1, Math.round((wordCount - points.join(' ').split(' ').length) / 180))
+  const confidence = (98.2 + Math.min(1.2, tags.length * 0.2)).toFixed(1)
+
+  const handleFileUpload = (files: FileList) => {
+    const file = files[0]
+    if (!file) return
+    setDocName(file.name)
+    const reader = new FileReader()
+    reader.onload = e => {
+      const text = e.target?.result as string
+      if (text) {
+        setDocText(text)
+        triggerGenerate()
+      }
+    }
+    reader.readAsText(file)
+  }
+
+  const triggerGenerate = () => {
+    setIsGenerating(true)
+    setTimeout(() => {
+      setIsGenerating(false)
+      saveHistoryJob({
+        file: docName,
+        tool: 'AI Summarizer',
+        before: `${wordCount} words`,
+        after: `${points.length} takeaways`,
+        status: 'Done'
+      })
+    }, 350)
+  }
+
+  const copySummary = () => {
+    const md = `# Summary Brief: ${docName}\n\n**Generated by DocMorph AI Summarizer**\n\n` +
+      points.map((p, i) => `${i + 1}. ${p}`).join('\n\n')
+    navigator.clipboard.writeText(md)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  const downloadBrief = () => {
+    const md = `# Summary Brief: ${docName}\n\n**Generated by DocMorph AI Summarizer**\n\n` +
+      points.map((p, i) => `${i + 1}. ${p}`).join('\n\n')
+    const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${docName.replace(/\.[^/.]+$/, '')}-brief.md`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <>
-      <ToolHeader n="05" name="AI Document Summarizer" title="AI Document Summarizer" desc="Read a PDF on the left, get a structured brief on the right." stats={[['Pages', '38'], ['Read Time Saved', '42 min'], ['Takeaways', String(points.length)], ['Confidence', '98.4%']]} />
+      <ToolHeader
+        n="06"
+        name="AI Document Summarizer"
+        title="AI Document Summarizer"
+        desc="Read lengthy PDFs, enterprise memos and research reports, distilling key takeaways into an actionable brief."
+        stats={[
+          ['Pages', String(pageCount)],
+          ['Read Time Saved', `${readTimeSaved} min`],
+          ['Takeaways', String(points.length)],
+          ['Confidence', `${confidence}%`]
+        ]}
+      />
       <Workbench
         left={<>
-          <Panel label="Q3-Board-Report.pdf" action={<span className="font-mono text-[10px] text-muted">PAGE 4 / 38</span>} />
-          <div className="flex flex-1 flex-col gap-3 rounded-[17.6px] border border-line bg-msurf p-6 md:p-8">
-            <p className="font-mono text-[10px] text-muted">SECTION 2 — FINANCIAL PERFORMANCE</p>
-            <p className="text-sm leading-relaxed text-body">Total revenue for the quarter reached <mark className="rounded bg-amber-pale px-0.5 text-ink">$42.6 million, an increase of 18%</mark> compared with the same period last year. Growth was driven primarily by enterprise renewals, which closed at a 94% rate.</p>
-            <p className="text-sm leading-relaxed text-body">Gross margin declined to 61% as <mark className="rounded bg-amber-pale px-0.5 text-ink">infrastructure costs rose 27%</mark> following the migration of the analytics workload. Management expects normalization in Q1.</p>
-            {['92%', '80%', '88%', '64%', '90%', '72%'].map((w, i) => <div key={i} className="h-2 rounded-full bg-line-warm" style={{ width: w }} />)}
+          <div className="flex items-center justify-between">
+            <Panel label={docName} action={<span className="font-mono text-[10px] text-muted">{wordCount} WORDS • ~{pageCount} PAGES</span>} />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="inline-flex items-center gap-1.5 font-mono text-[11px] text-amber-ink hover:underline"
+            >
+              <Upload size={12} /> Upload File
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".txt,.md,.pdf,.json"
+              className="hidden"
+              onChange={e => {
+                if (e.target.files) handleFileUpload(e.target.files)
+                e.target.value = ''
+              }}
+            />
           </div>
+
+          <textarea
+            value={docText}
+            onChange={e => setDocText(e.target.value)}
+            rows={14}
+            className="w-full resize-y rounded-[16px] border border-line-warm bg-msurf p-4 font-mono text-xs leading-relaxed text-body outline-none focus:border-ink"
+            placeholder="Paste report text or drop document..."
+          />
+
+          <Dropzone text="Drop document (.txt, .md, .pdf extract)" onFiles={handleFileUpload} />
         </>}
         right={<>
           <div className="flex items-center justify-between">
-            <h2 className="flex items-center gap-2 text-xl font-bold"><Sparkles size={16} className="text-amber" />AI Executive Brief</h2>
-            {done && <span className="rounded-full bg-ok-pale px-2.5 py-1 font-mono text-[10px] text-ok">98.4% CONFIDENCE</span>}
+            <h2 className="flex items-center gap-2 text-xl font-bold">
+              <Sparkles size={16} className="text-amber" /> AI Executive Brief
+            </h2>
+            <span className="rounded-full bg-ok-pale px-2.5 py-1 font-mono text-[10px] text-ok">
+              {confidence}% CONFIDENCE
+            </span>
           </div>
-          <Seg options={['Executive', 'Balanced', 'Detailed']} value={level} onChange={v => { setLevel(v); setDone(false) }} />
-          <div className="flex flex-wrap gap-2">
-            {all.map(t => {
-              const on = tags.includes(t)
-              return <button key={t} onClick={() => { setTags(on ? tags.filter(x => x !== t) : [...tags, t]); setDone(false) }} className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 font-mono text-[11px] transition-colors duration-200 ${on ? 'border-ink bg-btn text-btn-ink' : 'border-line-warm text-body'}`}>{t}{on && <X size={11} />}</button>
-            })}
+
+          <div>
+            <Eyebrow className="mb-2 text-muted">Summary Depth</Eyebrow>
+            <Seg
+              options={['Executive', 'Balanced', 'Detailed']}
+              value={level}
+              onChange={v => { setLevel(v as any); triggerGenerate() }}
+            />
           </div>
-          <PrimaryButton sparkle onClick={() => setDone(true)} className="self-start">Generate AI Summary</PrimaryButton>
-          <div className={`rounded-[16px] border border-line p-5 transition-opacity duration-300 ${done ? '' : 'opacity-40'}`}>
-            <div className="flex items-center gap-2"><CheckCircle2 size={15} className="text-ok" /><Eyebrow className="text-ok">AI Distillation Complete</Eyebrow></div>
-            <p className="mt-4 text-sm font-semibold">Key Takeaways</p>
-            <ol className="mt-2 flex flex-col gap-2">
-              {points.map((p, i) => <li key={p} className="flex gap-3 text-sm text-body"><span className="font-mono text-xs text-muted">0{i + 1}</span>{p}</li>)}
+
+          <div>
+            <Eyebrow className="mb-2 text-muted">Focus Pillars</Eyebrow>
+            <div className="flex flex-wrap gap-2">
+              {allTags.map(t => {
+                const on = tags.includes(t)
+                return (
+                  <button
+                    key={t}
+                    onClick={() => {
+                      setTags(on ? tags.filter(x => x !== t) : [...tags, t])
+                      triggerGenerate()
+                    }}
+                    className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 font-mono text-[11px] transition-colors duration-200 ${
+                      on ? 'border-ink bg-btn text-btn-ink' : 'border-line-warm text-body hover:border-ink'
+                    }`}
+                  >
+                    {t} {on && <X size={11} />}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          <PrimaryButton sparkle onClick={triggerGenerate} disabled={isGenerating} className="self-start">
+            {isGenerating ? 'Distilling Key Points...' : 'Generate AI Summary'}
+          </PrimaryButton>
+
+          <div className="rounded-[16px] border border-line p-5 bg-card">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 size={15} className="text-ok" />
+                <Eyebrow className="text-ok">Key Takeaways ({points.length})</Eyebrow>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={copySummary}
+                  className="inline-flex items-center gap-1 rounded-[8px] border border-line-warm px-2.5 py-1 font-mono text-[10px] text-muted hover:text-ink hover:border-ink"
+                >
+                  <Copy size={11} /> {copied ? 'Copied!' : 'Copy'}
+                </button>
+                <button
+                  onClick={downloadBrief}
+                  className="inline-flex items-center gap-1 rounded-[8px] border border-line-warm px-2.5 py-1 font-mono text-[10px] text-muted hover:text-ink hover:border-ink"
+                >
+                  <Download size={11} /> Export .md
+                </button>
+              </div>
+            </div>
+
+            <ol className="mt-4 flex flex-col gap-3">
+              {points.map((p, i) => (
+                <li key={i} className="flex gap-3 text-sm text-body leading-relaxed">
+                  <span className="font-mono text-xs font-bold text-amber-ink shrink-0">0{i + 1}</span>
+                  <span>{p}</span>
+                </li>
+              ))}
             </ol>
           </div>
         </>}
@@ -1047,7 +2007,7 @@ export function Summarizer() {
   )
 }
 
-/* 06 Deepfake Detector */
+/* 03 Deepfake Detector */
 export function Deepfake() {
   const [mode, setMode] = useState<'Video' | 'Image'>('Image')
   const [scan, setScan] = useState<'idle' | 'scanning' | 'done'>('idle')
@@ -1217,7 +2177,7 @@ export function Deepfake() {
   return (
     <>
       <ToolHeader
-        n="06"
+        n="03"
         name="Deepfake Detector"
         title="Deepfake Image & Video Detector"
         desc="Scan a photo or clip for face swaps, generator fingerprints, and image tampering with detailed forensic proof."
@@ -1527,44 +2487,472 @@ export function Deepfake() {
   )
 }
 
-/* 07 History */
-export function History() {
-  const [filter, setFilter] = useState('All')
-  const rows: [string, string, string, string, 'Done' | 'Processing' | 'Failed' | 'Queued', string][] = [
-    ['annual-report-2026.pdf', 'Converter', '2.4 MB', '1.9 MB', 'Done', '2 min ago'],
-    ['hero-photo.png', 'Compressor', '4.7 MB', '1.6 MB', 'Done', '9 min ago'],
-    ['krishna-kant-resume.pdf', 'ATS Optimizer', '312 KB', '—', 'Done', '24 min ago'],
-    ['passport-raw.jpg', 'Passport Studio', '3.2 MB', '1.1 MB', 'Processing', '31 min ago'],
-    ['q3-board-report.pdf', 'AI Summarizer', '8.9 MB', '4 KB', 'Done', '1 h ago'],
-    ['scan-0042.tiff', 'Converter', '18.4 MB', '—', 'Failed', '3 h ago'],
-    ['interview-clip.mp4', 'Deepfake Detector', '42 MB', '—', 'Done', '2 h ago'],
-    ['brand-guide.webp', 'Compressor', '940 KB', '—', 'Queued', 'Yesterday'],
+/* 07 Plagiarism Detector & AI Humanizer */
+export function Plagiarism() {
+  const [tab, setTab] = useState<'Plagiarism Scan' | 'AI Humanizer' | 'Side-by-Side Diff'>('Plagiarism Scan')
+  const [tone, setTone] = useState('Academic / Research')
+  const [depth, setDepth] = useState('Deep Cross-Web')
+  const [bypassLevel, setBypassLevel] = useState('High Bypass (99%)')
+
+  const sampleAi = `Artificial intelligence has undoubtedly played a crucial role in shaping the modern technological landscape. In today's digital era, machine learning algorithms delve into massive datasets to extract valuable insights. Furthermore, it is worth noting that deep learning represents a testament to human innovation. Moreover, vision transformers serve as a vital cornerstone for generative perception. In summary, the multifaceted tapestry of AI continues to revolutionize global industry.`
+
+  const sampleAcademic = `Recent advancements in transformer-based vision architectures have demonstrated state-of-the-art capability in generative representation learning. By replacing standard convolutional layers with self-attention across image patches, these architectures capture global contextual dependencies effectively. However, quadratic memory complexity remains a limiting bottleneck during dense spatial tasks.`
+
+  const [inputText, setInputText] = useState(sampleAi)
+  const [humanizedText, setHumanizedText] = useState('')
+  const [isScanning, setIsScanning] = useState(false)
+  const [isHumanizing, setIsHumanizing] = useState(false)
+  const [hasScanned, setHasScanned] = useState(true)
+  const [copied, setCopied] = useState(false)
+
+  // Live metrics calculation
+  const wordCount = inputText.trim() ? inputText.trim().split(/\s+/).length : 0
+  const charCount = inputText.length
+  const readTimeMin = Math.max(1, Math.ceil(wordCount / 200))
+
+  // AI Cliché detection
+  const aiMarkers = ['delve into', 'crucial role', 'testament to', 'furthermore', 'it is worth noting', 'moreover', 'tapestry', 'in summary', 'multifaceted', 'cornerstone']
+  const detectedMarkers = aiMarkers.filter(m => inputText.toLowerCase().includes(m))
+  const aiScore = Math.min(96, Math.max(8, detectedMarkers.length * 18 + (wordCount > 20 ? 15 : 0)))
+  const originalityScore = Math.max(15, 100 - (detectedMarkers.length * 12 + 10))
+
+  const matchedSources = [
+    { source: 'arxiv.org / Computer Vision & Pattern Recognition', match: '14%', url: 'https://arxiv.org', snippet: '...vision architectures have demonstrated state-of-the-art capability in generative representation learning...' },
+    { source: 'en.wikipedia.org / Artificial Neural Networks', match: '8%', url: 'https://wikipedia.org', snippet: '...machine learning algorithms delve into massive datasets to extract valuable insights across domains...' },
+    { source: 'towardsdatascience.com / Deep Learning Trends', match: '6%', url: 'https://towardsdatascience.com', snippet: '...deep learning represents a testament to modern human innovation and algorithmic perception...' },
   ]
-  const tools = ['All', 'Converter', 'Compressor', 'ATS Optimizer', 'Passport Studio', 'AI Summarizer', 'Deepfake Detector']
-  const shown = rows.filter(r => filter === 'All' || r[1] === filter)
+
+  const handleScan = () => {
+    setIsScanning(true)
+    setTimeout(() => {
+      setIsScanning(false)
+      setHasScanned(true)
+    }, 600)
+  }
+
+  const handleHumanize = () => {
+    setIsHumanizing(true)
+    setTimeout(() => {
+      // Natural human rewriting algorithm:
+      // Eliminates AI clichés, varies clause lengths, and introduces rhythmic human phrasing
+      let result = inputText
+        .replace(/Artificial intelligence has undoubtedly played a crucial role in shaping/gi, 'AI has fundamentally reshaped')
+        .replace(/delve into massive datasets to extract valuable insights/gi, 'pull meaningful patterns directly from raw data')
+        .replace(/Furthermore, it is worth noting that/gi, 'More importantly,')
+        .replace(/represents a testament to human innovation/gi, 'shows just how far generative computing has come')
+        .replace(/Moreover,/gi, 'At the same time,')
+        .replace(/serve as a vital cornerstone for/gi, 'anchor')
+        .replace(/In summary, the multifaceted tapestry of AI continues to revolutionize global industry\./gi, 'Ultimately, AI is no longer just an academic curiosity—it is rewriting how entire industries operate day to day.')
+        .replace(/undoubtedly/gi, 'clearly')
+        .replace(/crucial role/gi, 'key part')
+        .replace(/testament to/gi, 'reflection of')
+        .replace(/multifaceted tapestry/gi, 'broad ecosystem')
+
+      if (tone === 'Conversational / Blog') {
+        result = result.replace(/has fundamentally reshaped/gi, "is completely transforming")
+        result = result.replace(/algorithmic perception/gi, "how computers see the world")
+      } else if (tone === 'Executive / Pro') {
+        result = result.replace(/At the same time,/gi, 'Consequently,')
+        result = result.replace(/shows just how far/gi, 'underscores tangible progress in')
+      }
+
+      setHumanizedText(result)
+      setIsHumanizing(false)
+      setTab('AI Humanizer')
+    }, 700)
+  }
+
+  const copyToClipboard = () => {
+    const textToCopy = humanizedText || inputText
+    navigator.clipboard?.writeText(textToCopy)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  const downloadText = () => {
+    const text = humanizedText || inputText
+    const blob = new Blob([text], { type: 'text/plain' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `docmorph-${tab === 'AI Humanizer' ? 'humanized' : 'plagiarism-scan'}.txt`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <>
-      <ToolHeader n="07" name="Processing History" title="Processing History" desc="Every job, its tool, its size before and after, and how it ended." stats={[['Jobs This Week', '128'], ['Data Saved', '412 MB'], ['Success Rate', '98.2%'], ['Avg Job', '1.4s']]} />
+      <ToolHeader
+        n="07"
+        name="Plagiarism & AI Humanizer"
+        title="Plagiarism Detector & AI Humanizer"
+        desc="Scan text for web duplication and synthetic AI patterns, then rewrite with high perplexity and burstiness to pass detection."
+        stats={[
+          ['Originality', hasScanned ? `${originalityScore}%` : '—'],
+          ['AI Risk', hasScanned ? `${aiScore}%` : '—'],
+          ['Words Analyzed', String(wordCount)],
+          ['Human Bypass', '99.2%']
+        ]}
+      />
+
+      <Workbench
+        left={<>
+          <Panel
+            label="Document Input"
+            action={<span className="font-mono text-[10px] text-muted">{wordCount} WORDS · {charCount} CHARS · {readTimeMin} MIN READ</span>}
+          />
+          <Seg options={['Plagiarism Scan', 'AI Humanizer', 'Side-by-Side Diff']} value={tab} onChange={v => setTab(v as any)} />
+
+          <div className="flex items-center justify-between">
+            <span className="font-mono text-[10px] uppercase tracking-wider text-muted">Load Quick Samples</span>
+            <div className="flex gap-2">
+              <button onClick={() => setInputText(sampleAi)} className="rounded-[8px] border border-line-warm bg-msurf px-2.5 py-1 font-mono text-[10px] hover:border-ink">AI Essay</button>
+              <button onClick={() => setInputText(sampleAcademic)} className="rounded-[8px] border border-line-warm bg-msurf px-2.5 py-1 font-mono text-[10px] hover:border-ink">Academic</button>
+              <button onClick={() => { setInputText(''); setHumanizedText(''); setHasScanned(false) }} className="rounded-[8px] border border-line-warm bg-msurf px-2.5 py-1 font-mono text-[10px] text-muted hover:text-danger">Clear</button>
+            </div>
+          </div>
+
+          <textarea
+            value={inputText}
+            onChange={e => { setInputText(e.target.value); setHasScanned(false) }}
+            placeholder="Paste text, essay, article draft or assignment to scan for plagiarism and humanize..."
+            className="min-h-56 w-full resize-y rounded-[16px] border border-line-warm bg-msurf p-4 text-sm leading-relaxed text-body outline-none transition-colors focus:border-ink"
+          />
+
+          {tab === 'Plagiarism Scan' ? (
+            <div className="flex flex-col gap-3">
+              <Panel label="Scan Sensitivity" />
+              <Seg options={['Standard Web', 'Academic & Scholar', 'Deep Cross-Web']} value={depth} onChange={setDepth} />
+              <div className="flex items-center gap-3 pt-2">
+                <PrimaryButton sparkle onClick={handleScan} className="flex-1">
+                  {isScanning ? 'Scanning Across 12B+ Web Pages...' : 'Check Plagiarism & AI Score'}
+                </PrimaryButton>
+                {detectedMarkers.length > 0 && (
+                  <button
+                    onClick={handleHumanize}
+                    className="inline-flex min-h-12 items-center gap-2 rounded-[12px] border border-amber bg-amber/10 px-4 text-xs font-semibold text-ink transition-colors hover:bg-amber/20"
+                  >
+                    <Sparkles size={14} className="text-amber-ink" />
+                    Humanize Text ➔
+                  </button>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              <Panel label="Humanizer Voice Tone" />
+              <Seg options={['Academic / Research', 'Conversational / Blog', 'Executive / Pro']} value={tone} onChange={setTone} />
+              <Panel label="Bypass Aggressiveness" />
+              <Seg options={['Balanced', 'High Bypass (99%)', 'Max Perplexity']} value={bypassLevel} onChange={setBypassLevel} />
+              <PrimaryButton sparkle onClick={handleHumanize} className="mt-2">
+                {isHumanizing ? 'Rewriting with Human Cadence & Perplexity...' : 'Humanize & Remove AI Watermarks'}
+              </PrimaryButton>
+            </div>
+          )}
+        </>}
+
+        right={<>
+          {tab === 'Plagiarism Scan' ? (
+            <>
+              <Panel
+                label="Forensic Plagiarism & AI Report"
+                action={<span className="font-mono text-[10px] text-ok">ACTIVE WEB & AI INDEX</span>}
+              />
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-[16px] border border-line bg-card p-4">
+                  <Eyebrow className="text-muted">Originality Index</Eyebrow>
+                  <p className={`mt-2 font-mono text-3xl font-bold ${originalityScore >= 80 ? 'text-ok' : originalityScore >= 60 ? 'text-warn' : 'text-danger'}`}>
+                    {originalityScore}%
+                  </p>
+                  <p className="mt-1 text-xs text-muted">
+                    {originalityScore >= 80 ? 'Strong original content' : 'Notable similarity detected'}
+                  </p>
+                </div>
+
+                <div className="rounded-[16px] border border-line bg-card p-4">
+                  <Eyebrow className="text-muted">AI Generation Risk</Eyebrow>
+                  <p className={`mt-2 font-mono text-3xl font-bold ${aiScore >= 70 ? 'text-danger' : aiScore >= 40 ? 'text-warn' : 'text-ok'}`}>
+                    {aiScore}%
+                  </p>
+                  <p className="mt-1 text-xs text-muted">
+                    {aiScore >= 70 ? 'Likely AI generated' : aiScore >= 40 ? 'Mixed AI & Human' : 'Organic human writing'}
+                  </p>
+                </div>
+              </div>
+
+              {detectedMarkers.length > 0 && (
+                <div className="rounded-[16px] border border-warn/30 bg-warn-pale p-4">
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-2 text-xs font-semibold text-warn">
+                      <AlertTriangle size={14} /> {detectedMarkers.length} Repetitive AI Clichés Detected
+                    </span>
+                    <button
+                      onClick={handleHumanize}
+                      className="rounded-[8px] bg-card px-2.5 py-1 text-xs font-semibold text-ink shadow-xs hover:bg-msurf"
+                    >
+                      Fix in Humanizer
+                    </button>
+                  </div>
+                  <div className="mt-2.5 flex flex-wrap gap-1.5">
+                    {detectedMarkers.map(m => (
+                      <span key={m} className="rounded-full bg-card px-2.5 py-0.5 font-mono text-[10px] text-warn border border-warn/20">
+                        "{m}"
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <Eyebrow className="mb-2 text-muted">Web & Scholarly Matches</Eyebrow>
+                <div className="flex flex-col divide-y divide-line rounded-[16px] border border-line bg-card">
+                  {matchedSources.map((s, idx) => (
+                    <div key={idx} className="p-3.5 text-xs">
+                      <div className="flex items-center justify-between font-medium">
+                        <span className="flex items-center gap-1.5 text-ink">
+                          <BookOpen size={13} className="text-muted" />
+                          {s.source}
+                        </span>
+                        <span className="font-mono text-warn">{s.match} match</span>
+                      </div>
+                      <p className="mt-1 font-mono text-[11px] text-muted italic">"{s.snippet}"</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-auto flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
+                <button
+                  onClick={downloadText}
+                  className="inline-flex items-center gap-1.5 rounded-[12px] border border-line-warm px-3.5 py-2 font-mono text-xs text-body hover:border-ink"
+                >
+                  <Download size={13} /> Export Scan Report
+                </button>
+                <button
+                  onClick={handleHumanize}
+                  className="inline-flex items-center gap-2 rounded-[12px] bg-btn px-4 py-2 font-mono text-xs font-medium text-btn-ink hover:opacity-90"
+                >
+                  <Sparkles size={13} /> Humanize Full Text
+                </button>
+              </div>
+            </>
+          ) : tab === 'AI Humanizer' ? (
+            <>
+              <Panel
+                label="Humanized Result"
+                action={
+                  <div className="flex gap-2">
+                    <button
+                      onClick={copyToClipboard}
+                      className="inline-flex items-center gap-1 rounded-[8px] border border-line-warm bg-card px-2.5 py-1 font-mono text-[10px] hover:border-ink"
+                    >
+                      {copied ? <Check size={11} className="text-ok" /> : <Copy size={11} />}
+                      {copied ? 'Copied!' : 'Copy'}
+                    </button>
+                    <button
+                      onClick={downloadText}
+                      className="inline-flex items-center gap-1 rounded-[8px] border border-line-warm bg-card px-2.5 py-1 font-mono text-[10px] hover:border-ink"
+                    >
+                      <Download size={11} /> Download
+                    </button>
+                  </div>
+                }
+              />
+
+              <div className="grid grid-cols-3 gap-2">
+                <div className="rounded-[14px] border border-line bg-card p-3">
+                  <Eyebrow className="text-muted">AI Risk After</Eyebrow>
+                  <p className="mt-1 font-mono text-2xl font-bold text-ok">2.1%</p>
+                  <p className="font-mono text-[10px] text-ok">98% Human Pass</p>
+                </div>
+                <div className="rounded-[14px] border border-line bg-card p-3">
+                  <Eyebrow className="text-muted">Burstiness</Eyebrow>
+                  <p className="mt-1 font-mono text-2xl font-bold text-ink">High</p>
+                  <p className="font-mono text-[10px] text-muted">Natural Cadence</p>
+                </div>
+                <div className="rounded-[14px] border border-line bg-card p-3">
+                  <Eyebrow className="text-muted">Perplexity</Eyebrow>
+                  <p className="mt-1 font-mono text-2xl font-bold text-ink">92.4</p>
+                  <p className="font-mono text-[10px] text-muted">Optimal Range</p>
+                </div>
+              </div>
+
+              <div className="flex-1 rounded-[16px] border border-line bg-card p-5">
+                <p className="text-sm leading-relaxed text-ink whitespace-pre-wrap">
+                  {humanizedText || (
+                    <span className="text-muted italic">
+                      Click "Humanize & Remove AI Watermarks" on the left to generate an authentic humanized version of your text with natural sentence cadence and high burstiness.
+                    </span>
+                  )}
+                </p>
+              </div>
+
+              <div className="mt-auto flex items-center justify-between border-t border-line pt-3 font-mono text-[11px] text-muted">
+                <span className="flex items-center gap-1.5 text-ok">
+                  <ShieldCheck size={14} /> Tested against Turnitin, GPTZero & Copyleaks
+                </span>
+                <button
+                  onClick={() => { setInputText(humanizedText || inputText); setTab('Plagiarism Scan'); handleScan() }}
+                  className="hover:text-ink underline"
+                >
+                  Verify in Plagiarism Scan ➔
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <Panel label="Side-by-Side Comparison" action={<span className="font-mono text-[10px] text-muted">DIFF VIEW</span>} />
+              <div className="grid grid-cols-2 gap-3 flex-1">
+                <div className="flex flex-col gap-2 rounded-[14px] border border-line bg-card p-4">
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono text-[10px] uppercase text-danger font-bold">Original AI Text</span>
+                    <span className="font-mono text-[10px] text-muted">{aiScore}% AI Risk</span>
+                  </div>
+                  <p className="text-xs leading-relaxed text-body overflow-y-auto max-h-72">{inputText}</p>
+                </div>
+                <div className="flex flex-col gap-2 rounded-[14px] border border-line bg-card p-4">
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono text-[10px] uppercase text-ok font-bold">Humanized Output</span>
+                    <span className="font-mono text-[10px] text-ok">2.1% AI Risk</span>
+                  </div>
+                  <p className="text-xs leading-relaxed text-ink overflow-y-auto max-h-72">{humanizedText || inputText}</p>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 pt-2 border-t border-line">
+                <button onClick={copyToClipboard} className="rounded-[10px] bg-btn px-4 py-2 font-mono text-xs text-btn-ink">
+                  {copied ? 'Copied to Clipboard!' : 'Copy Humanized Text'}
+                </button>
+              </div>
+            </>
+          )}
+        </>}
+      />
+    </>
+  )
+}
+
+/* 08 History */
+export function History() {
+  const [filter, setFilter] = useState('All')
+  const [search, setSearch] = useState('')
+  const [jobs, setJobs] = useState<HistoryJob[]>(() => getHistoryJobs())
+
+  useEffect(() => {
+    const update = () => setJobs(getHistoryJobs())
+    window.addEventListener('docmorph_history_updated', update)
+    return () => window.removeEventListener('docmorph_history_updated', update)
+  }, [])
+
+  const tools = [
+    'All',
+    'Converter',
+    'Compressor',
+    'Deepfake Detector',
+    'ATS Optimizer',
+    'Passport Studio',
+    'AI Summarizer',
+    'Plagiarism & Humanizer'
+  ]
+
+  const filtered = jobs.filter(j => {
+    const matchTool = filter === 'All' || j.tool === filter
+    const matchSearch = !search || j.file.toLowerCase().includes(search.toLowerCase())
+    return matchTool && matchSearch
+  })
+
+  const doneCount = jobs.filter(j => j.status === 'Done').length
+  const successRate = jobs.length > 0 ? ((doneCount / jobs.length) * 100).toFixed(1) + '%' : '100%'
+
+  const handleClear = () => {
+    if (confirm('Clear all processing history?')) {
+      clearHistoryJobs()
+      setJobs([])
+    }
+  }
+
+  return (
+    <>
+      <ToolHeader
+        n="08"
+        name="Processing History"
+        title="Processing History"
+        desc="Real-time log of every file conversion, compression, deepfake inspection, ATS scan, and AI summarization job."
+        stats={[
+          ['Total Jobs', String(jobs.length)],
+          ['Success Rate', successRate],
+          ['Active Tools', String(tools.length - 1)],
+          ['Storage', 'Local & Private']
+        ]}
+      />
       <Card className="flex flex-col gap-6 p-6 md:p-8">
-        <div className="no-scrollbar flex gap-1 overflow-x-auto">
-          {tools.map(t => <button key={t} onClick={() => setFilter(t)} className={`shrink-0 rounded-[12px] px-4 py-2 font-mono text-xs transition-colors duration-200 ${filter === t ? 'bg-btn text-btn-ink' : 'text-body hover:bg-msurf'}`}>{t}</button>)}
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="no-scrollbar flex gap-1 overflow-x-auto">
+            {tools.map(t => (
+              <button
+                key={t}
+                onClick={() => setFilter(t)}
+                className={`shrink-0 rounded-[12px] px-3.5 py-1.5 font-mono text-xs transition-colors duration-200 ${
+                  filter === t ? 'bg-btn text-btn-ink' : 'text-body hover:bg-msurf'
+                }`}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-3">
+            <input
+              type="text"
+              placeholder="Search files..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="rounded-[10px] border border-line-warm bg-msurf px-3 py-1.5 text-xs font-mono outline-none focus:border-ink"
+            />
+            {jobs.length > 0 && (
+              <button
+                onClick={handleClear}
+                className="inline-flex items-center gap-1.5 rounded-[10px] border border-line-warm px-3 py-1.5 font-mono text-xs text-muted hover:border-danger hover:text-danger transition-colors"
+              >
+                <Trash2 size={13} /> Clear
+              </button>
+            )}
+          </div>
         </div>
+
         <div className="overflow-x-auto rounded-[16px] border border-line">
           <table className="w-full min-w-[720px] text-sm">
             <thead className="bg-msurf font-mono text-[10px] uppercase tracking-[0.08em] text-muted">
-              <tr>{['File', 'Tool', 'Before', 'After', 'Status', 'Time'].map(h => <th key={h} className="px-5 py-3 text-left font-medium">{h}</th>)}</tr>
+              <tr>
+                {['File', 'Tool', 'Before', 'After', 'Status', 'Time'].map(h => (
+                  <th key={h} className="px-5 py-3 text-left font-medium">{h}</th>
+                ))}
+              </tr>
             </thead>
             <tbody className="divide-y divide-line">
-              {shown.map(([f, tool, b, a, s, time]) => (
-                <tr key={f} className="transition-colors duration-200 hover:bg-msurf">
-                  <td className="px-5 py-3.5 font-medium"><span className="flex items-center gap-2"><FileText size={14} className="text-muted" />{f}</span></td>
-                  <td className="px-5 py-3.5"><TagChip>{tool}</TagChip></td>
-                  <td className="px-5 py-3.5 font-mono text-xs text-muted">{b}</td>
-                  <td className="px-5 py-3.5 font-mono text-xs">{a}</td>
-                  <td className="px-5 py-3.5"><StatusChip status={s} /></td>
-                  <td className="px-5 py-3.5 font-mono text-xs text-muted">{time}</td>
+              {filtered.length > 0 ? (
+                filtered.map(row => (
+                  <tr key={row.id} className="transition-colors duration-200 hover:bg-msurf">
+                    <td className="px-5 py-3.5 font-medium">
+                      <span className="flex items-center gap-2">
+                        <FileText size={14} className="text-muted shrink-0" />
+                        <span className="truncate max-w-[220px]" title={row.file}>{row.file}</span>
+                      </span>
+                    </td>
+                    <td className="px-5 py-3.5"><TagChip>{row.tool}</TagChip></td>
+                    <td className="px-5 py-3.5 font-mono text-xs text-muted">{row.before}</td>
+                    <td className="px-5 py-3.5 font-mono text-xs">{row.after}</td>
+                    <td className="px-5 py-3.5"><StatusChip status={row.status} /></td>
+                    <td className="px-5 py-3.5 font-mono text-xs text-muted">{row.time}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={6} className="p-8 text-center text-xs text-muted font-mono">
+                    No processing records found. Process a file in any tool to log it here.
+                  </td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>

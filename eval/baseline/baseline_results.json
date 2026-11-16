@@ -1,0 +1,1212 @@
+[
+  {
+    "filename": "dji_camera_sample.jpg",
+    "category": "real_camera",
+    "per_detector_readings": {
+      "AI Generator Check (Midjourney/DALL-E)": {
+        "reading": "10.0% AI Risk",
+        "result": "Real Photo",
+        "statusType": "ok"
+      },
+      "Face Swap / Deepfake Check": {
+        "reading": "< 1% Risk",
+        "result": "No Face Swap",
+        "statusType": "ok"
+      },
+      "AI Watermark Scan": {
+        "reading": "None",
+        "result": "Clean",
+        "statusType": "ok"
+      },
+      "Photo Editing & Splicing (ELA)": {
+        "reading": "Diffused by compression",
+        "result": "Not applicable",
+        "statusType": "info"
+      },
+      "Camera Lens Physics": {
+        "reading": "Diffused by compression",
+        "result": "Not applicable",
+        "statusType": "info"
+      },
+      "Camera Device Info": {
+        "reading": "Stripped by platform",
+        "result": "Not applicable",
+        "statusType": "info"
+      },
+      "AI Digital Signature (C2PA)": {
+        "reading": "None",
+        "result": "Not applicable",
+        "statusType": "info"
+      }
+    },
+    "final_score": 10,
+    "final_verdict": "Likely Real",
+    "verdict_type": "ok",
+    "quality": {
+      "confidence": "reduced",
+      "source": "unknown",
+      "jpegQuality": 65,
+      "flags": [
+        {
+          "label": "Moderately compressed",
+          "severity": "soft"
+        }
+      ],
+      "notes": [
+        "No camera metadata (normal for webcams and messaging apps)."
+      ]
+    },
+    "summary": "Analyzed under reduced confidence (Moderately compressed). Secondary forensic signals excluded."
+  },
+  {
+    "filename": "oneplus_11r_sample1.jpg",
+    "category": "real_camera",
+    "per_detector_readings": {
+      "AI Generator Check (Midjourney/DALL-E)": {
+        "reading": "4.2% AI Risk",
+        "result": "Real Photo",
+        "statusType": "ok"
+      },
+      "Face Swap / Deepfake Check": {
+        "reading": "0.2% Risk",
+        "result": "No Face Swap",
+        "statusType": "ok"
+      },
+      "AI Watermark Scan": {
+        "reading": "None",
+        "result": "Clean",
+        "statusType": "ok"
+      },
+      "Photo Editing & Splicing (ELA)": {
+        "reading": "Uniform compression",
+        "result": "Original (No Splicing)",
+        "statusType": "ok"
+      },
+      "Camera Lens Physics": {
+        "reading": "Natural lens blur",
+        "result": "Real Camera Lens",
+        "statusType": "ok"
+      },
+      "Camera Device Info": {
+        "reading": "OnePlus OnePlus 11R 5G",
+        "result": "Camera: OnePlus OnePlus 11R 5G",
+        "statusType": "ok"
+      },
+      "AI Digital Signature (C2PA)": {
+        "reading": "None",
+        "result": "No AI Tag",
+        "statusType": "info"
+      }
+    },
+    "final_score": 4,
+    "final_verdict": "Authentic Real Photograph",
+    "verdict_type": "ok",
+    "quality": {
+      "confidence": "high",
+      "source": "unknown",
+      "jpegQuality": 99,
+      "flags": [],
+      "notes": []
+    },
+    "summary": "Original camera hardware confirmed: OnePlus OnePlus 11R 5G."
+  },
+  {
+    "filename": "oneplus_11r_sample2.jpg",
+    "category": "real_camera",
+    "per_detector_readings": {
+      "AI Generator Check (Midjourney/DALL-E)": {
+        "reading": "4.2% AI Risk",
+        "result": "Real Photo",
+        "statusType": "ok"
+      },
+      "Face Swap / Deepfake Check": {
+        "reading": "0.2% Risk",
+        "result": "No Face Swap",
+        "statusType": "ok"
+      },
+      "AI Watermark Scan": {
+        "reading": "None",
+        "result": "Clean",
+        "statusType": "ok"
+      },
+      "Photo Editing & Splicing (ELA)": {
+        "reading": "Uniform compression",
+        "result": "Original (No Splicing)",
+        "statusType": "ok"
+      },
+      "Camera Lens Physics": {
+        "reading": "Natural lens blur",
+        "result": "Real Camera Lens",
+        "statusType": "ok"
+      },
+      "Camera Device Info": {
+        "reading": "OnePlus OnePlus 11R 5G",
+        "result": "Camera: OnePlus OnePlus 11R 5G",
+        "statusType": "ok"
+      },
+      "AI Digital Signature (C2PA)": {
+        "reading": "None",
+        "result": "No AI Tag",
+        "statusType": "info"
+      }
+    },
+    "final_score": 4,
+    "final_verdict": "Authentic Real Photograph",
+    "verdict_type": "ok",
+    "quality": {
+      "confidence": "high",
+      "source": "unknown",
+      "jpegQuality": 99,
+      "flags": [],
+      "notes": []
+    },
+    "summary": "Original camera hardware confirmed: OnePlus OnePlus 11R 5G."
+  },
+  {
+    "filename": "oneplus_11r_sample3.jpg",
+    "category": "real_camera",
+    "per_detector_readings": {
+      "AI Generator Check (Midjourney/DALL-E)": {
+        "reading": "4.2% AI Risk",
+        "result": "Real Photo",
+        "statusType": "ok"
+      },
+      "Face Swap / Deepfake Check": {
+        "reading": "0.2% Risk",
+        "result": "No Face Swap",
+        "statusType": "ok"
+      },
+      "AI Watermark Scan": {
+        "reading": "None",
+        "result": "Clean",
+        "statusType": "ok"
+      },
+      "Photo Editing & Splicing (ELA)": {
+        "reading": "Uniform compression",
+        "result": "Original (No Splicing)",
+        "statusType": "ok"
+      },
+      "Camera Lens Physics": {
+        "reading": "Natural lens blur",
+        "result": "Real Camera Lens",
+        "statusType": "ok"
+      },
+      "Camera Device Info": {
+        "reading": "OnePlus OnePlus 11R 5G",
+        "result": "Camera: OnePlus OnePlus 11R 5G",
+        "statusType": "ok"
+      },
+      "AI Digital Signature (C2PA)": {
+        "reading": "None",
+        "result": "No AI Tag",
+        "statusType": "info"
+      }
+    },
+    "final_score": 4,
+    "final_verdict": "Authentic Real Photograph",
+    "verdict_type": "ok",
+    "quality": {
+      "confidence": "high",
+      "source": "unknown",
+      "jpegQuality": 99,
+      "flags": [],
+      "notes": []
+    },
+    "summary": "Original camera hardware confirmed: OnePlus OnePlus 11R 5G."
+  },
+  {
+    "filename": "WIN_20261007_120001_Pro.jpg",
+    "category": "real_webcam",
+    "per_detector_readings": {
+      "AI Generator Check (Midjourney/DALL-E)": {
+        "reading": "15.0% AI Risk",
+        "result": "Real Photo",
+        "statusType": "ok"
+      },
+      "Face Swap / Deepfake Check": {
+        "reading": "0.8% Risk",
+        "result": "No Face Swap",
+        "statusType": "ok"
+      },
+      "AI Watermark Scan": {
+        "reading": "None",
+        "result": "Clean",
+        "statusType": "ok"
+      },
+      "Photo Editing & Splicing (ELA)": {
+        "reading": "Uniform compression",
+        "result": "Original (No Splicing)",
+        "statusType": "ok"
+      },
+      "Camera Lens Physics": {
+        "reading": "Natural lens blur",
+        "result": "Real Camera Lens",
+        "statusType": "ok"
+      },
+      "Camera Device Info": {
+        "reading": "None",
+        "result": "No Device Info (Web / App)",
+        "statusType": "info"
+      },
+      "AI Digital Signature (C2PA)": {
+        "reading": "None",
+        "result": "No AI Tag",
+        "statusType": "info"
+      }
+    },
+    "final_score": 15,
+    "final_verdict": "Authentic Real Photograph",
+    "verdict_type": "ok",
+    "quality": {
+      "confidence": "high",
+      "source": "webcam",
+      "jpegQuality": 85,
+      "flags": [],
+      "notes": [
+        "No camera metadata (normal for webcams and messaging apps).",
+        "Looks like a Windows Camera capture."
+      ]
+    },
+    "summary": "Natural sensor textures and uniform compression verified."
+  },
+  {
+    "filename": "WIN_20261007_120002_Pro.jpg",
+    "category": "real_webcam",
+    "per_detector_readings": {
+      "AI Generator Check (Midjourney/DALL-E)": {
+        "reading": "15.0% AI Risk",
+        "result": "Real Photo",
+        "statusType": "ok"
+      },
+      "Face Swap / Deepfake Check": {
+        "reading": "0.8% Risk",
+        "result": "No Face Swap",
+        "statusType": "ok"
+      },
+      "AI Watermark Scan": {
+        "reading": "None",
+        "result": "Clean",
+        "statusType": "ok"
+      },
+      "Photo Editing & Splicing (ELA)": {
+        "reading": "Uniform compression",
+        "result": "Original (No Splicing)",
+        "statusType": "ok"
+      },
+      "Camera Lens Physics": {
+        "reading": "Natural lens blur",
+        "result": "Real Camera Lens",
+        "statusType": "ok"
+      },
+      "Camera Device Info": {
+        "reading": "None",
+        "result": "No Device Info (Web / App)",
+        "statusType": "info"
+      },
+      "AI Digital Signature (C2PA)": {
+        "reading": "None",
+        "result": "No AI Tag",
+        "statusType": "info"
+      }
+    },
+    "final_score": 15,
+    "final_verdict": "Authentic Real Photograph",
+    "verdict_type": "ok",
+    "quality": {
+      "confidence": "high",
+      "source": "webcam",
+      "jpegQuality": 80,
+      "flags": [],
+      "notes": [
+        "No camera metadata (normal for webcams and messaging apps).",
+        "Looks like a Windows Camera capture."
+      ]
+    },
+    "summary": "Natural sensor textures and uniform compression verified."
+  },
+  {
+    "filename": "whatsapp_sample1.jpeg",
+    "category": "real_whatsapp",
+    "per_detector_readings": {
+      "AI Generator Check (Midjourney/DALL-E)": {
+        "reading": "10.0% AI Risk",
+        "result": "Real Photo",
+        "statusType": "ok"
+      },
+      "Face Swap / Deepfake Check": {
+        "reading": "< 1% Risk",
+        "result": "No Face Swap",
+        "statusType": "ok"
+      },
+      "AI Watermark Scan": {
+        "reading": "None",
+        "result": "Clean",
+        "statusType": "ok"
+      },
+      "Photo Editing & Splicing (ELA)": {
+        "reading": "Diffused by compression",
+        "result": "Not applicable",
+        "statusType": "info"
+      },
+      "Camera Lens Physics": {
+        "reading": "Diffused by compression",
+        "result": "Not applicable",
+        "statusType": "info"
+      },
+      "Camera Device Info": {
+        "reading": "Stripped by platform",
+        "result": "Not applicable",
+        "statusType": "info"
+      },
+      "AI Digital Signature (C2PA)": {
+        "reading": "None",
+        "result": "Not applicable",
+        "statusType": "info"
+      }
+    },
+    "final_score": 10,
+    "final_verdict": "Likely Real",
+    "verdict_type": "ok",
+    "quality": {
+      "confidence": "reduced",
+      "source": "whatsapp",
+      "jpegQuality": 61,
+      "flags": [
+        {
+          "label": "Re-compressed by WhatsApp",
+          "severity": "soft"
+        },
+        {
+          "label": "Moderately compressed",
+          "severity": "soft"
+        }
+      ],
+      "notes": [
+        "No camera metadata (normal for webcams and messaging apps)."
+      ]
+    },
+    "summary": "Analyzed under reduced confidence (Re-compressed by WhatsApp, Moderately compressed). Secondary forensic signals excluded."
+  },
+  {
+    "filename": "whatsapp_sample2.jpeg",
+    "category": "real_whatsapp",
+    "per_detector_readings": {
+      "AI Generator Check (Midjourney/DALL-E)": {
+        "reading": "10.0% AI Risk",
+        "result": "Real Photo",
+        "statusType": "ok"
+      },
+      "Face Swap / Deepfake Check": {
+        "reading": "< 1% Risk",
+        "result": "No Face Swap",
+        "statusType": "ok"
+      },
+      "AI Watermark Scan": {
+        "reading": "None",
+        "result": "Clean",
+        "statusType": "ok"
+      },
+      "Photo Editing & Splicing (ELA)": {
+        "reading": "Diffused by compression",
+        "result": "Not applicable",
+        "statusType": "info"
+      },
+      "Camera Lens Physics": {
+        "reading": "Diffused by compression",
+        "result": "Not applicable",
+        "statusType": "info"
+      },
+      "Camera Device Info": {
+        "reading": "Stripped by platform",
+        "result": "Not applicable",
+        "statusType": "info"
+      },
+      "AI Digital Signature (C2PA)": {
+        "reading": "None",
+        "result": "Not applicable",
+        "statusType": "info"
+      }
+    },
+    "final_score": 10,
+    "final_verdict": "Likely Real",
+    "verdict_type": "ok",
+    "quality": {
+      "confidence": "reduced",
+      "source": "whatsapp",
+      "jpegQuality": 69,
+      "flags": [
+        {
+          "label": "Re-compressed by WhatsApp",
+          "severity": "soft"
+        },
+        {
+          "label": "Moderately compressed",
+          "severity": "soft"
+        }
+      ],
+      "notes": [
+        "No camera metadata (normal for webcams and messaging apps)."
+      ]
+    },
+    "summary": "Analyzed under reduced confidence (Re-compressed by WhatsApp, Moderately compressed). Secondary forensic signals excluded."
+  },
+  {
+    "filename": "whatsapp_sample3.jpeg",
+    "category": "real_whatsapp",
+    "per_detector_readings": {
+      "AI Generator Check (Midjourney/DALL-E)": {
+        "reading": "10.0% AI Risk",
+        "result": "Real Photo",
+        "statusType": "ok"
+      },
+      "Face Swap / Deepfake Check": {
+        "reading": "< 1% Risk",
+        "result": "No Face Swap",
+        "statusType": "ok"
+      },
+      "AI Watermark Scan": {
+        "reading": "None",
+        "result": "Clean",
+        "statusType": "ok"
+      },
+      "Photo Editing & Splicing (ELA)": {
+        "reading": "Diffused by compression",
+        "result": "Not applicable",
+        "statusType": "info"
+      },
+      "Camera Lens Physics": {
+        "reading": "Diffused by compression",
+        "result": "Not applicable",
+        "statusType": "info"
+      },
+      "Camera Device Info": {
+        "reading": "Stripped by platform",
+        "result": "Not applicable",
+        "statusType": "info"
+      },
+      "AI Digital Signature (C2PA)": {
+        "reading": "None",
+        "result": "Not applicable",
+        "statusType": "info"
+      }
+    },
+    "final_score": 10,
+    "final_verdict": "Likely Real",
+    "verdict_type": "ok",
+    "quality": {
+      "confidence": "reduced",
+      "source": "whatsapp",
+      "jpegQuality": 69,
+      "flags": [
+        {
+          "label": "Re-compressed by WhatsApp",
+          "severity": "soft"
+        },
+        {
+          "label": "Moderately compressed",
+          "severity": "soft"
+        }
+      ],
+      "notes": [
+        "No camera metadata (normal for webcams and messaging apps)."
+      ]
+    },
+    "summary": "Analyzed under reduced confidence (Re-compressed by WhatsApp, Moderately compressed). Secondary forensic signals excluded."
+  },
+  {
+    "filename": "pinterest_pin_real_564w.jpg",
+    "category": "real_pinterest",
+    "per_detector_readings": {
+      "AI Generator Check (Midjourney/DALL-E)": {
+        "reading": "Low Confidence",
+        "result": "Inconclusive",
+        "statusType": "info"
+      },
+      "Face Swap / Deepfake Check": {
+        "reading": "Not enough data",
+        "result": "N/A",
+        "statusType": "info"
+      },
+      "AI Watermark Scan": {
+        "reading": "None",
+        "result": "Clean (Degraded)",
+        "statusType": "info"
+      },
+      "Photo Editing & Splicing (ELA)": {
+        "reading": "Compression artifacts",
+        "result": "N/A (Re-compressed)",
+        "statusType": "info"
+      },
+      "Camera Lens Physics": {
+        "reading": "Diffused by compression",
+        "result": "N/A",
+        "statusType": "info"
+      },
+      "Camera Device Info": {
+        "reading": "None",
+        "result": "Metadata stripped",
+        "statusType": "info"
+      },
+      "AI Digital Signature (C2PA)": {
+        "reading": "None",
+        "result": "No AI Tag",
+        "statusType": "info"
+      }
+    },
+    "final_score": null,
+    "final_verdict": "Inconclusive",
+    "verdict_type": "info",
+    "quality": {
+      "confidence": "unreliable",
+      "source": "unknown",
+      "jpegQuality": 75,
+      "flags": [
+        {
+          "label": "Social-media resized copy",
+          "severity": "hard"
+        }
+      ],
+      "notes": [
+        "No camera metadata (normal for webcams and messaging apps)."
+      ]
+    },
+    "summary": "This image appears to be a screenshot or heavily re-compressed copy (Social-media resized copy). Forensic signals are unreliable, so we can't give a trustworthy result. Try the original file."
+  },
+  {
+    "filename": "pinterest_pin_real_736w.jpg",
+    "category": "real_pinterest",
+    "per_detector_readings": {
+      "AI Generator Check (Midjourney/DALL-E)": {
+        "reading": "Low Confidence",
+        "result": "Inconclusive",
+        "statusType": "info"
+      },
+      "Face Swap / Deepfake Check": {
+        "reading": "Not enough data",
+        "result": "N/A",
+        "statusType": "info"
+      },
+      "AI Watermark Scan": {
+        "reading": "None",
+        "result": "Clean (Degraded)",
+        "statusType": "info"
+      },
+      "Photo Editing & Splicing (ELA)": {
+        "reading": "Compression artifacts",
+        "result": "N/A (Re-compressed)",
+        "statusType": "info"
+      },
+      "Camera Lens Physics": {
+        "reading": "Diffused by compression",
+        "result": "N/A",
+        "statusType": "info"
+      },
+      "Camera Device Info": {
+        "reading": "None",
+        "result": "Metadata stripped",
+        "statusType": "info"
+      },
+      "AI Digital Signature (C2PA)": {
+        "reading": "None",
+        "result": "No AI Tag",
+        "statusType": "info"
+      }
+    },
+    "final_score": null,
+    "final_verdict": "Inconclusive",
+    "verdict_type": "info",
+    "quality": {
+      "confidence": "unreliable",
+      "source": "unknown",
+      "jpegQuality": 75,
+      "flags": [
+        {
+          "label": "Social-media resized copy",
+          "severity": "hard"
+        }
+      ],
+      "notes": [
+        "No camera metadata (normal for webcams and messaging apps)."
+      ]
+    },
+    "summary": "This image appears to be a screenshot or heavily re-compressed copy (Social-media resized copy). Forensic signals are unreliable, so we can't give a trustworthy result. Try the original file."
+  },
+  {
+    "filename": "deepfake_sample1.jpg",
+    "category": "ai_clean",
+    "per_detector_readings": {
+      "AI Generator Check (Midjourney/DALL-E)": {
+        "reading": "15.0% AI Risk",
+        "result": "Real Photo",
+        "statusType": "ok"
+      },
+      "Face Swap / Deepfake Check": {
+        "reading": "0.8% Risk",
+        "result": "No Face Swap",
+        "statusType": "ok"
+      },
+      "AI Watermark Scan": {
+        "reading": "None",
+        "result": "Clean",
+        "statusType": "ok"
+      },
+      "Photo Editing & Splicing (ELA)": {
+        "reading": "Uniform compression",
+        "result": "Original (No Splicing)",
+        "statusType": "ok"
+      },
+      "Camera Lens Physics": {
+        "reading": "Natural lens blur",
+        "result": "Real Camera Lens",
+        "statusType": "ok"
+      },
+      "Camera Device Info": {
+        "reading": "None",
+        "result": "No Device Info (Web / App)",
+        "statusType": "info"
+      },
+      "AI Digital Signature (C2PA)": {
+        "reading": "None",
+        "result": "No AI Tag",
+        "statusType": "info"
+      }
+    },
+    "final_score": 15,
+    "final_verdict": "Authentic Real Photograph",
+    "verdict_type": "ok",
+    "quality": {
+      "confidence": "high",
+      "source": "unknown",
+      "jpegQuality": 95,
+      "flags": [],
+      "notes": [
+        "No camera metadata (normal for webcams and messaging apps)."
+      ]
+    },
+    "summary": "Natural sensor textures and uniform compression verified."
+  },
+  {
+    "filename": "deepfake_sample2.jpg",
+    "category": "ai_clean",
+    "per_detector_readings": {
+      "AI Generator Check (Midjourney/DALL-E)": {
+        "reading": "15.0% AI Risk",
+        "result": "Real Photo",
+        "statusType": "ok"
+      },
+      "Face Swap / Deepfake Check": {
+        "reading": "0.8% Risk",
+        "result": "No Face Swap",
+        "statusType": "ok"
+      },
+      "AI Watermark Scan": {
+        "reading": "None",
+        "result": "Clean",
+        "statusType": "ok"
+      },
+      "Photo Editing & Splicing (ELA)": {
+        "reading": "Uniform compression",
+        "result": "Original (No Splicing)",
+        "statusType": "ok"
+      },
+      "Camera Lens Physics": {
+        "reading": "Natural lens blur",
+        "result": "Real Camera Lens",
+        "statusType": "ok"
+      },
+      "Camera Device Info": {
+        "reading": "None",
+        "result": "No Device Info (Web / App)",
+        "statusType": "info"
+      },
+      "AI Digital Signature (C2PA)": {
+        "reading": "None",
+        "result": "No AI Tag",
+        "statusType": "info"
+      }
+    },
+    "final_score": 15,
+    "final_verdict": "Authentic Real Photograph",
+    "verdict_type": "ok",
+    "quality": {
+      "confidence": "high",
+      "source": "unknown",
+      "jpegQuality": 95,
+      "flags": [],
+      "notes": [
+        "No camera metadata (normal for webcams and messaging apps)."
+      ]
+    },
+    "summary": "Natural sensor textures and uniform compression verified."
+  },
+  {
+    "filename": "deepfake_sample3.jpg",
+    "category": "ai_clean",
+    "per_detector_readings": {
+      "AI Generator Check (Midjourney/DALL-E)": {
+        "reading": "15.0% AI Risk",
+        "result": "Real Photo",
+        "statusType": "ok"
+      },
+      "Face Swap / Deepfake Check": {
+        "reading": "0.8% Risk",
+        "result": "No Face Swap",
+        "statusType": "ok"
+      },
+      "AI Watermark Scan": {
+        "reading": "None",
+        "result": "Clean",
+        "statusType": "ok"
+      },
+      "Photo Editing & Splicing (ELA)": {
+        "reading": "Uniform compression",
+        "result": "Original (No Splicing)",
+        "statusType": "ok"
+      },
+      "Camera Lens Physics": {
+        "reading": "Natural lens blur",
+        "result": "Real Camera Lens",
+        "statusType": "ok"
+      },
+      "Camera Device Info": {
+        "reading": "None",
+        "result": "No Device Info (Web / App)",
+        "statusType": "info"
+      },
+      "AI Digital Signature (C2PA)": {
+        "reading": "None",
+        "result": "No AI Tag",
+        "statusType": "info"
+      }
+    },
+    "final_score": 15,
+    "final_verdict": "Authentic Real Photograph",
+    "verdict_type": "ok",
+    "quality": {
+      "confidence": "high",
+      "source": "unknown",
+      "jpegQuality": 95,
+      "flags": [],
+      "notes": [
+        "No camera metadata (normal for webcams and messaging apps)."
+      ]
+    },
+    "summary": "Natural sensor textures and uniform compression verified."
+  },
+  {
+    "filename": "deepfake_sample4.jpg",
+    "category": "ai_clean",
+    "per_detector_readings": {
+      "AI Generator Check (Midjourney/DALL-E)": {
+        "reading": "15.0% AI Risk",
+        "result": "Real Photo",
+        "statusType": "ok"
+      },
+      "Face Swap / Deepfake Check": {
+        "reading": "0.8% Risk",
+        "result": "No Face Swap",
+        "statusType": "ok"
+      },
+      "AI Watermark Scan": {
+        "reading": "None",
+        "result": "Clean",
+        "statusType": "ok"
+      },
+      "Photo Editing & Splicing (ELA)": {
+        "reading": "Uniform compression",
+        "result": "Original (No Splicing)",
+        "statusType": "ok"
+      },
+      "Camera Lens Physics": {
+        "reading": "Natural lens blur",
+        "result": "Real Camera Lens",
+        "statusType": "ok"
+      },
+      "Camera Device Info": {
+        "reading": "None",
+        "result": "No Device Info (Web / App)",
+        "statusType": "info"
+      },
+      "AI Digital Signature (C2PA)": {
+        "reading": "None",
+        "result": "No AI Tag",
+        "statusType": "info"
+      }
+    },
+    "final_score": 15,
+    "final_verdict": "Authentic Real Photograph",
+    "verdict_type": "ok",
+    "quality": {
+      "confidence": "high",
+      "source": "unknown",
+      "jpegQuality": 95,
+      "flags": [],
+      "notes": [
+        "No camera metadata (normal for webcams and messaging apps)."
+      ]
+    },
+    "summary": "Natural sensor textures and uniform compression verified."
+  },
+  {
+    "filename": "WhatsApp Image 2026-10-01 at 14.30.22.jpeg",
+    "category": "ai_whatsapp",
+    "per_detector_readings": {
+      "AI Generator Check (Midjourney/DALL-E)": {
+        "reading": "10.0% AI Risk",
+        "result": "Real Photo",
+        "statusType": "ok"
+      },
+      "Face Swap / Deepfake Check": {
+        "reading": "< 1% Risk",
+        "result": "No Face Swap",
+        "statusType": "ok"
+      },
+      "AI Watermark Scan": {
+        "reading": "None",
+        "result": "Clean",
+        "statusType": "ok"
+      },
+      "Photo Editing & Splicing (ELA)": {
+        "reading": "Diffused by compression",
+        "result": "Not applicable",
+        "statusType": "info"
+      },
+      "Camera Lens Physics": {
+        "reading": "Diffused by compression",
+        "result": "Not applicable",
+        "statusType": "info"
+      },
+      "Camera Device Info": {
+        "reading": "Stripped by platform",
+        "result": "Not applicable",
+        "statusType": "info"
+      },
+      "AI Digital Signature (C2PA)": {
+        "reading": "None",
+        "result": "Not applicable",
+        "statusType": "info"
+      }
+    },
+    "final_score": 10,
+    "final_verdict": "Likely Real",
+    "verdict_type": "ok",
+    "quality": {
+      "confidence": "reduced",
+      "source": "whatsapp",
+      "jpegQuality": 70,
+      "flags": [
+        {
+          "label": "Re-compressed by WhatsApp",
+          "severity": "soft"
+        }
+      ],
+      "notes": [
+        "No camera metadata (normal for webcams and messaging apps)."
+      ]
+    },
+    "summary": "Analyzed under reduced confidence (Re-compressed by WhatsApp). Secondary forensic signals excluded."
+  },
+  {
+    "filename": "WhatsApp Image 2026-10-02 at 09.15.10.jpeg",
+    "category": "ai_whatsapp",
+    "per_detector_readings": {
+      "AI Generator Check (Midjourney/DALL-E)": {
+        "reading": "10.0% AI Risk",
+        "result": "Real Photo",
+        "statusType": "ok"
+      },
+      "Face Swap / Deepfake Check": {
+        "reading": "< 1% Risk",
+        "result": "No Face Swap",
+        "statusType": "ok"
+      },
+      "AI Watermark Scan": {
+        "reading": "None",
+        "result": "Clean",
+        "statusType": "ok"
+      },
+      "Photo Editing & Splicing (ELA)": {
+        "reading": "Diffused by compression",
+        "result": "Not applicable",
+        "statusType": "info"
+      },
+      "Camera Lens Physics": {
+        "reading": "Diffused by compression",
+        "result": "Not applicable",
+        "statusType": "info"
+      },
+      "Camera Device Info": {
+        "reading": "Stripped by platform",
+        "result": "Not applicable",
+        "statusType": "info"
+      },
+      "AI Digital Signature (C2PA)": {
+        "reading": "None",
+        "result": "Not applicable",
+        "statusType": "info"
+      }
+    },
+    "final_score": 10,
+    "final_verdict": "Likely Real",
+    "verdict_type": "ok",
+    "quality": {
+      "confidence": "reduced",
+      "source": "whatsapp",
+      "jpegQuality": 68,
+      "flags": [
+        {
+          "label": "Re-compressed by WhatsApp",
+          "severity": "soft"
+        },
+        {
+          "label": "Moderately compressed",
+          "severity": "soft"
+        }
+      ],
+      "notes": [
+        "No camera metadata (normal for webcams and messaging apps)."
+      ]
+    },
+    "summary": "Analyzed under reduced confidence (Re-compressed by WhatsApp, Moderately compressed). Secondary forensic signals excluded."
+  },
+  {
+    "filename": "pinterest_ai_564w.jpg",
+    "category": "ai_pinterest",
+    "per_detector_readings": {
+      "AI Generator Check (Midjourney/DALL-E)": {
+        "reading": "Low Confidence",
+        "result": "Inconclusive",
+        "statusType": "info"
+      },
+      "Face Swap / Deepfake Check": {
+        "reading": "Not enough data",
+        "result": "N/A",
+        "statusType": "info"
+      },
+      "AI Watermark Scan": {
+        "reading": "None",
+        "result": "Clean (Degraded)",
+        "statusType": "info"
+      },
+      "Photo Editing & Splicing (ELA)": {
+        "reading": "Compression artifacts",
+        "result": "N/A (Re-compressed)",
+        "statusType": "info"
+      },
+      "Camera Lens Physics": {
+        "reading": "Diffused by compression",
+        "result": "N/A",
+        "statusType": "info"
+      },
+      "Camera Device Info": {
+        "reading": "None",
+        "result": "Metadata stripped",
+        "statusType": "info"
+      },
+      "AI Digital Signature (C2PA)": {
+        "reading": "None",
+        "result": "No AI Tag",
+        "statusType": "info"
+      }
+    },
+    "final_score": null,
+    "final_verdict": "Inconclusive",
+    "verdict_type": "info",
+    "quality": {
+      "confidence": "unreliable",
+      "source": "unknown",
+      "jpegQuality": 75,
+      "flags": [
+        {
+          "label": "Social-media resized copy",
+          "severity": "hard"
+        }
+      ],
+      "notes": [
+        "No camera metadata (normal for webcams and messaging apps)."
+      ]
+    },
+    "summary": "This image appears to be a screenshot or heavily re-compressed copy (Social-media resized copy). Forensic signals are unreliable, so we can't give a trustworthy result. Try the original file."
+  },
+  {
+    "filename": "screenshot_sample1.png",
+    "category": "screenshot",
+    "per_detector_readings": {
+      "AI Generator Check (Midjourney/DALL-E)": {
+        "reading": "Low Confidence",
+        "result": "Inconclusive",
+        "statusType": "info"
+      },
+      "Face Swap / Deepfake Check": {
+        "reading": "Not enough data",
+        "result": "N/A",
+        "statusType": "info"
+      },
+      "AI Watermark Scan": {
+        "reading": "None",
+        "result": "Clean (Degraded)",
+        "statusType": "info"
+      },
+      "Photo Editing & Splicing (ELA)": {
+        "reading": "Compression artifacts",
+        "result": "N/A (Re-compressed)",
+        "statusType": "info"
+      },
+      "Camera Lens Physics": {
+        "reading": "Diffused by compression",
+        "result": "N/A",
+        "statusType": "info"
+      },
+      "Camera Device Info": {
+        "reading": "None",
+        "result": "Metadata stripped",
+        "statusType": "info"
+      },
+      "AI Digital Signature (C2PA)": {
+        "reading": "None",
+        "result": "No AI Tag",
+        "statusType": "info"
+      }
+    },
+    "final_score": null,
+    "final_verdict": "Inconclusive",
+    "verdict_type": "info",
+    "quality": {
+      "confidence": "unreliable",
+      "source": "screenshot",
+      "jpegQuality": null,
+      "flags": [
+        {
+          "label": "Screenshot",
+          "severity": "hard"
+        },
+        {
+          "label": "Very low resolution",
+          "severity": "hard"
+        }
+      ],
+      "notes": [
+        "No camera metadata (normal for webcams and messaging apps)."
+      ]
+    },
+    "summary": "This image appears to be a screenshot or heavily re-compressed copy (Screenshot, Very low resolution). Forensic signals are unreliable, so we can't give a trustworthy result. Try the original file."
+  },
+  {
+    "filename": "screenshot_sample2.png",
+    "category": "screenshot",
+    "per_detector_readings": {
+      "AI Generator Check (Midjourney/DALL-E)": {
+        "reading": "Low Confidence",
+        "result": "Inconclusive",
+        "statusType": "info"
+      },
+      "Face Swap / Deepfake Check": {
+        "reading": "Not enough data",
+        "result": "N/A",
+        "statusType": "info"
+      },
+      "AI Watermark Scan": {
+        "reading": "None",
+        "result": "Clean (Degraded)",
+        "statusType": "info"
+      },
+      "Photo Editing & Splicing (ELA)": {
+        "reading": "Compression artifacts",
+        "result": "N/A (Re-compressed)",
+        "statusType": "info"
+      },
+      "Camera Lens Physics": {
+        "reading": "Diffused by compression",
+        "result": "N/A",
+        "statusType": "info"
+      },
+      "Camera Device Info": {
+        "reading": "None",
+        "result": "Metadata stripped",
+        "statusType": "info"
+      },
+      "AI Digital Signature (C2PA)": {
+        "reading": "None",
+        "result": "No AI Tag",
+        "statusType": "info"
+      }
+    },
+    "final_score": null,
+    "final_verdict": "Inconclusive",
+    "verdict_type": "info",
+    "quality": {
+      "confidence": "unreliable",
+      "source": "screenshot",
+      "jpegQuality": null,
+      "flags": [
+        {
+          "label": "Screenshot",
+          "severity": "hard"
+        }
+      ],
+      "notes": [
+        "No camera metadata (normal for webcams and messaging apps)."
+      ]
+    },
+    "summary": "This image appears to be a screenshot or heavily re-compressed copy (Screenshot). Forensic signals are unreliable, so we can't give a trustworthy result. Try the original file."
+  },
+  {
+    "filename": "screenshot_sample3.png",
+    "category": "screenshot",
+    "per_detector_readings": {
+      "AI Generator Check (Midjourney/DALL-E)": {
+        "reading": "Low Confidence",
+        "result": "Inconclusive",
+        "statusType": "info"
+      },
+      "Face Swap / Deepfake Check": {
+        "reading": "Not enough data",
+        "result": "N/A",
+        "statusType": "info"
+      },
+      "AI Watermark Scan": {
+        "reading": "None",
+        "result": "Clean (Degraded)",
+        "statusType": "info"
+      },
+      "Photo Editing & Splicing (ELA)": {
+        "reading": "Compression artifacts",
+        "result": "N/A (Re-compressed)",
+        "statusType": "info"
+      },
+      "Camera Lens Physics": {
+        "reading": "Diffused by compression",
+        "result": "N/A",
+        "statusType": "info"
+      },
+      "Camera Device Info": {
+        "reading": "None",
+        "result": "Metadata stripped",
+        "statusType": "info"
+      },
+      "AI Digital Signature (C2PA)": {
+        "reading": "None",
+        "result": "No AI Tag",
+        "statusType": "info"
+      }
+    },
+    "final_score": null,
+    "final_verdict": "Inconclusive",
+    "verdict_type": "info",
+    "quality": {
+      "confidence": "unreliable",
+      "source": "screenshot",
+      "jpegQuality": null,
+      "flags": [
+        {
+          "label": "Screenshot",
+          "severity": "hard"
+        }
+      ],
+      "notes": [
+        "No camera metadata (normal for webcams and messaging apps)."
+      ]
+    },
+    "summary": "This image appears to be a screenshot or heavily re-compressed copy (Screenshot). Forensic signals are unreliable, so we can't give a trustworthy result. Try the original file."
+  }
+]

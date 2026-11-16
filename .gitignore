@@ -23,5 +23,7 @@ __pycache__/
 *.py[cod]
 .DS_Store
 Thumbs.db
+*.bak
 *.baseline.bak
-eval/
+models/*.onnx
+models/*.pt

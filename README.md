@@ -22,14 +22,14 @@ Everyday digital tasks force students, professionals, and recruiters across doze
 ## 🚀 Core Capabilities
 
 ### 1. 🛡️ Multi-Modal Deepfake Forensic Detector *(Flagship AI Engine)*
-- **Dual-Model Neural Classification**: Fine-tuned Vision Transformer (`dima806/ai_vs_real_image_detection`) and EfficientNet-B0 running on hardware-accelerated GPUs and Web-optimized inference engines.
-- **7-Layer Image Audit**:
-  - **C2PA Provenance Manifests**: Cryptographic signature validation for synthetic media origin (OpenAI DALL-E, Midjourney, Google Imagen).
+- **Neural Deepfake Classification**: High-speed ONNX-optimized EfficientNet-B0 inference engine (~14ms per image) running locally alongside Vision Transformer (`dima806/ai_vs_real_image_detection`).
+- **Multi-Signal Image Audit**:
+  - **Google Gemini Sparkle Watermark Matcher**: Morphological Top-Hat filter and normalized cross-correlation (NCC) to catch Gemini AI watermarks.
+  - **C2PA Provenance Manifests**: Cryptographic signature validation for synthetic media origin (OpenAI DALL-E, Midjourney, Google SynthID).
   - **Hardware Sensor & EXIF Analysis**: Camera make/model verification vs. web export sanitization.
-  - **Error Level Analysis (ELA)**: Compression artifact heatmaps highlighting localized edits.
-  - **2D Fast Fourier Transform (FFT)**: High-frequency spectrum analysis detecting generative grid artifacts.
-  - **Optical Chromatic Dispersion**: Lens physics consistency verification.
-- **Temporal Video Deepfake Scanner**: Uniform keyframe extraction via OpenCV with temporal variance tracking ($\sigma > 5.0$) to detect frame-splicing and face swaps.
+  - **Error Level Analysis (ELA)**: Compression artifact block variance highlighting localized photo edits and face splicing.
+  - **Optical Chromatic Dispersion**: Real glass lens physics consistency verification (R-B edge divergence).
+- **3-Tier Input Quality Gate**: DQT JPEG quantization quality analysis classifying confidence (High / Reduced / Inconclusive), properly handling WhatsApp and webcam compression without false positives.
 
 ### 2. 📄 ATS Resume Optimizer
 - **Real-Time Score Gauge**: Live benchmark scoring against target job descriptions.
@@ -117,7 +117,7 @@ python detector.py
 
 ## 👥 Authors & Team
 
-- **Krishna Kant** ([@krshhh6](https://github.com/krshhh6)) — *Creator · Frontend Architecture, File Conversions, AI Forensics & Video Deepfake Engine*
+- **Krishna Kant** ([@krshhh6](https://github.com/krshhh6)) — *Creator · Frontend Architecture, File Conversions, AI Forensics & Deepfake Detection*
 - **Sampoorn Tripathi** — *ATS Resume Scoring Engine & AI Summarizer*
 - **Divyam Pathak** ([@divyam-pathak02](https://github.com/divyam-pathak02)) — *Passport Photo Studio & Plagiarism Analyzer*
 

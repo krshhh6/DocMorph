@@ -1,20 +1,21 @@
 import { useEffect, useRef } from 'react'
-import { ScanFace, Clock, FileCheck2, Home, Minimize2, Smartphone, Sparkles, Sun, Moon, SquareUser, Users, Grid2X2, Menu, X } from 'lucide-react'
+import { ScanFace, Clock, FileCheck2, Home, Minimize2, Smartphone, Sparkles, Sun, Moon, SquareUser, Users, Grid2X2, Menu, X, FileSearch } from 'lucide-react'
 import { Logo } from './ui'
 import LoadingScreen from './LoadingScreen'
 
-export type PageId = 'home' | 'converter' | 'compressor' | 'ats' | 'passport' | 'summarizer' | 'deepfake' | 'history' | 'team'
+export type PageId = 'home' | 'converter' | 'compressor' | 'deepfake' | 'ats' | 'passport' | 'summarizer' | 'plagiarism' | 'history' | 'team'
 
 export const NAV: { id: PageId; label: string; icon: typeof Home }[] = [
   { id: 'home', label: 'Workspace', icon: Home },
   { id: 'converter', label: '01 Converter', icon: Smartphone },
   { id: 'compressor', label: '02 Compressor', icon: Minimize2 },
-  { id: 'ats', label: '03 ATS Resume Optimizer', icon: FileCheck2 },
-  { id: 'passport', label: '04 Passport Photo Studio', icon: SquareUser },
-  { id: 'summarizer', label: '05 AI Summarizer', icon: Sparkles },
-  { id: 'deepfake', label: '06 Deepfake Detector', icon: ScanFace },
-  { id: 'history', label: '07 Processing History', icon: Clock },
-  { id: 'team', label: '08 Our Team', icon: Users },
+  { id: 'deepfake', label: '03 Deepfake Detector', icon: ScanFace },
+  { id: 'ats', label: '04 ATS Resume Optimizer', icon: FileCheck2 },
+  { id: 'passport', label: '05 Passport Photo Studio', icon: SquareUser },
+  { id: 'summarizer', label: '06 AI Summarizer', icon: Sparkles },
+  { id: 'plagiarism', label: '07 Plagiarism & Humanizer', icon: FileSearch },
+  { id: 'history', label: '08 Processing History', icon: Clock },
+  { id: 'team', label: '09 Our Team', icon: Users },
 ]
 
 type Props = { page: PageId; go: (p: PageId) => void; dark: boolean; toggle: () => void }
