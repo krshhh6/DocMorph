@@ -25,6 +25,7 @@ export default defineConfig(({ mode }) => {
       react(),
       tailwindcss(),
       localModelPlugin(),
+      excludeWasmPlugin(),
       figmaSiteConfiguration(siteConfiguration),
       figmaErrorOverlayReplay(),
       figmaReactRefreshBoundaryFallback(),
@@ -389,6 +390,20 @@ function localModelPlugin(): Plugin {
         }
         next()
       })
+    },
+  }
+}
+
+/** Exclude heavy 28MB wasm file since onnxruntime-web fetches from jsdelivr CDN at runtime, keeping all assets under Vercel's 25MB file limit */
+function excludeWasmPlugin(): Plugin {
+  return {
+    name: 'exclude-wasm',
+    generateBundle(_, bundle) {
+      for (const fileName of Object.keys(bundle)) {
+        if (fileName.endsWith('.wasm')) {
+          delete bundle[fileName]
+        }
+      }
     },
   }
 }
