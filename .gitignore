@@ -27,3 +27,5 @@ Thumbs.db
 *.baseline.bak
 models/*.onnx
 models/*.pt
+ 
+eval/
