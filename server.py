@@ -4,10 +4,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from converter import convert_file, merge_images_to_pdf
 from ats_api import router as ats_router
+from plagiarism_api import router as plagiarism_router
 import uvicorn
 
 app = FastAPI(title="DocMorph File Conversion API")
 app.include_router(ats_router)
+app.include_router(plagiarism_router)
 
 # Allow all origins (allows Vercel deployed frontend and localhost)
 app.add_middleware(

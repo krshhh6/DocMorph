@@ -1,0 +1,11 @@
+server.py
+converter.py
+ats_api.py
+plagiarism_api.py
+Dockerfile
+requirements.txt
+forensics/
+ats/
+docs/
+eval/
+__pycache__/

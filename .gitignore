@@ -29,3 +29,7 @@ models/*.onnx
 models/*.pt
  
 eval/
+docs/
+src/assets/team/
+*.joblib
+
